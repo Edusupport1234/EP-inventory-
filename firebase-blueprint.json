@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Represents a single SKU in the warehouse.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "qty": { "type": "number" },
+        "qtyOld": { "type": "number" },
+        "qtyNew": { "type": "number" },
+        "qtyOffice": { "type": "number" },
+        "location": { "type": "string" },
+        "barcodes": { "type": "array" },
+        "isNew": { "type": "boolean" },
+        "goal": { "type": "number" },
+        "img": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "qty"]
+    },
+    "Rack": {
+      "title": "Warehouse Rack",
+      "description": "A physical rack in the 3D visualizer.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "position": { "type": "array" },
+        "filled": { "type": "number" },
+        "zone": { "type": "string" },
+        "utilization": { "type": "number" }
+      },
+      "required": ["name", "position"]
+    }
+  },
+  "firestore": {
+    "inventory": {
+      "schema": "InventoryItem",
+      "description": "Collection of products and their quantities across warehouses."
+    },
+    "racks": {
+      "schema": "Rack",
+      "description": "Collection of storage racks for the 3D visualizer."
+    }
+  }
+}

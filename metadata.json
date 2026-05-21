@@ -1,0 +1,6 @@
+{
+  "name": "Corporate Inventory Nexus",
+  "description": "A modern, high-performance inventory management system featuring a 3D location visualizer for rack placement and stock counting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
