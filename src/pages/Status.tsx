@@ -842,7 +842,7 @@ export default function Status() {
                 const totalOnHand = availableQty + reservedQty;
 
                 return (
-                  <div key={itemObj.id || idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl transition-all hover:border-slate-300">
+                  <div key={itemObj.id ? `live-prod-${itemObj.id}-${idx}` : `live-prod-idx-${idx}`} className="p-3 bg-slate-50 border border-slate-100 rounded-xl transition-all hover:border-slate-300">
                     <div className="flex items-start justify-between gap-1">
                       <h3 className="text-xs font-extrabold text-slate-700 truncate block max-w-[80%]" title={itemObj.name}>
                         {itemObj.name}
@@ -940,7 +940,7 @@ export default function Status() {
                   >
                     <option value="">-- Choose Synced Firebase Product --</option>
                     {products.map((p, idx) => (
-                      <option key={p.id || idx} value={p.name}>
+                      <option key={p.id ? `select-prod-${p.id}-${idx}` : `select-prod-idx-${idx}`} value={p.name}>
                         {p.name} (Avail: {p.qty || 0})
                       </option>
                     ))}

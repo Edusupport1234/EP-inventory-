@@ -985,14 +985,14 @@ export default function Locations() {
                           {(levelItems.length > 0 || levelReservations.length > 0) ? (
                             <div className="space-y-2">
                               {/* Standard Inventory Items */}
-                              {levelItems.map(item => {
+                              {levelItems.map((item, idx) => {
                                 // Calculate same color index used in 3D boxes
                                 const hash = item.name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
                                 const colors = ["#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899"];
                                 const boxColor = colors[hash % colors.length];
 
                                 return (
-                                  <div key={item.id} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100">
+                                  <div key={item.id ? `rack-item-${item.id}-${idx}` : `rack-item-idx-${idx}`} className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-100">
                                     <div className="flex items-center gap-2 truncate">
                                       <span className="w-2.5 h-2.5 rounded shrink-0" style={{ backgroundColor: boxColor }} />
                                       <p className="text-[11px] font-bold text-slate-800 uppercase truncate leading-snug">{item.name}</p>
@@ -1012,8 +1012,8 @@ export default function Locations() {
                               })}
 
                               {/* Reserved Client Holds */}
-                              {levelReservations.map(res => (
-                                <div key={res.id} className="flex items-center justify-between bg-amber-50/50 p-2 rounded border border-amber-100">
+                              {levelReservations.map((res, idx) => (
+                                <div key={res.id ? `rack-res-${res.id}-${idx}` : `rack-res-idx-${idx}`} className="flex items-center justify-between bg-amber-50/50 p-2 rounded border border-amber-100">
                                   <div className="flex items-center gap-2 truncate">
                                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                                     <div className="truncate">

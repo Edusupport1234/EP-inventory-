@@ -5,7 +5,9 @@ import { getDatabase, ref, onValue, set, update, push, remove } from 'firebase/d
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const isUserProject = firebaseConfig.projectId === 'epedu-inventory-database';
+const dbId = isUserProject ? undefined : firebaseConfig.firestoreDatabaseId;
+export const db = getFirestore(app, dbId);
 export const auth = getAuth(app);
 export const rtdb = getDatabase(app);
 
