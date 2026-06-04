@@ -33,6 +33,7 @@ export default function Inventory() {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
   const [user, setUser] = useState(auth.currentUser);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,7 +50,19 @@ export default function Inventory() {
   const [adjTakenBy, setAdjTakenBy] = useState('');
   const [newName, setNewName] = useState('');
 
-  // Hold Stock / Reservation Modal State
+  // Create Brand New Item State
+  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+  const [isSavingItem, setIsSavingItem] = useState(false);
+  const [saveSuccessDetails, setSaveSuccessDetails] = useState<{ name: string; qty: number } | null>(null);
+  const [newItemDetails, setNewItemDetails] = useState({
+    name: '',
+    qtyOld: '0',
+    qtyNew: '0',
+    qtyOffice: '0',
+    goal: '5',
+    barcode: '',
+    imgUrl: ''
+  });
   const [holdModal, setHoldModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
   const [holdClientName, setHoldClientName] = useState('');
   const [holdQty, setHoldQty] = useState('1');
@@ -145,6 +158,78 @@ export default function Inventory() {
       unsubscribeRtdb = () => rtdbUnsub();
     } catch (e) {
       console.error("RTDB reservations subscription failed in Inventory: ", e);
+    }
+
+    return () => {
+      unsubscribeFirestore();
+      unsubscribeRtdb();
+    };
+  }, [user]);
+
+  // Fetch statuses in real-time (Dual-Sync Firestore & RTDB)
+  useEffect(() => {
+    let firestoreRecords: any[] = [];
+    let rtdbRecords: any[] = [];
+
+    const handleMergeStatuses = () => {
+      const mergedMap = new Map<string, any>();
+      rtdbRecords.forEach(record => mergedMap.set(record.id, record));
+      firestoreRecords.forEach(record => mergedMap.set(record.id, record));
+      setStatuses(Array.from(mergedMap.values()));
+    };
+
+    // 1. Firestore subscriber
+    const q = query(collection(db, 'statuses'));
+    const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
+      firestoreRecords = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          order: data.order || 'Unknown Order',
+          item: data.item || 'Unnamed Item',
+          qty: Number(data.qty ?? 1),
+          status: data.status || 'Loan',
+          where: data.where || 'Client',
+          remarks: data.remarks || '',
+          actor: data.actor || '',
+          ts: data.ts
+        };
+      });
+      handleMergeStatuses();
+    }, (error) => {
+      console.warn("Could not load Firestore statuses in Inventory view.", error);
+    });
+
+    // 2. RTDB subscriber
+    let unsubscribeRtdb = () => {};
+    try {
+      const rtdbRef = ref(rtdb, 'statuses');
+      const rtdbUnsub = onValue(rtdbRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          rtdbRecords = Object.entries(data).map(([key, value]: [string, any]) => {
+            return {
+              id: key,
+              order: value.order || 'Unknown Order',
+              item: value.item || 'Unnamed Item',
+              qty: Number(value.qty ?? value.quantity ?? 1),
+              status: value.status || 'Loan',
+              where: value.where || 'Client',
+              remarks: value.remarks || '',
+              actor: value.actor || '',
+              ts: value.ts || 0
+            };
+          });
+        } else {
+          rtdbRecords = [];
+        }
+        handleMergeStatuses();
+      }, (err) => {
+        console.warn("Could not load RTDB statuses in Inventory view.", err);
+      });
+      unsubscribeRtdb = () => rtdbUnsub();
+    } catch (e) {
+      console.error("RTDB statuses subscription failed in Inventory: ", e);
     }
 
     return () => {
@@ -332,30 +417,8 @@ export default function Inventory() {
     }
 
     try {
-      // 1. Deduct the reserved quantity from the selected warehouse location and overall total
-      const newLocQty = Math.max(0, currentLocQty - qtyNum);
-      const newTotalQty = Math.max(0, (holdModal.item.qty || 0) - qtyNum);
-
-      // Firestore product update
-      try {
-        await updateDoc(doc(db, 'inventory', holdModal.item.id), {
-          [field]: newLocQty,
-          qty: newTotalQty
-        });
-      } catch (err_f) {
-        console.warn("Firestore product update missed:", err_f);
-      }
-
-      // RTDB product update
-      try {
-        await update(ref(rtdb, `inventory/${holdModal.item.id}`), {
-          [field]: newLocQty,
-          qty: newTotalQty
-        });
-      } catch (err_rtdb) {
-        console.warn("RTDB inventory sync missed", err_rtdb);
-      }
-
+      // 1. For a stock hold / reservation, we do NOT deduct the stock immediately from the location/total.
+      // It stays in the warehouse on-hand for tracking, but shows as reserved/subtracted in available calculations.
       // 2. Clear Firestore FieldValue object from RTDB payload by keeping them separate
       const payloadFirestore = {
         orderId: holdOrderId.trim().toUpperCase(),
@@ -369,6 +432,7 @@ export default function Inventory() {
         remarks: holdRemarks.trim(),
         location: holdLocation,
         actor: user?.email || 'System',
+        stockDeducted: false,
         ts: serverTimestamp()
       };
 
@@ -390,6 +454,7 @@ export default function Inventory() {
         remarks: holdRemarks.trim(),
         location: holdLocation,
         actor: user?.email || 'System',
+        stockDeducted: false,
         ts: Date.now()
       };
 
@@ -400,10 +465,11 @@ export default function Inventory() {
         order: holdOrderId.trim().toUpperCase(),
         item: holdModal.item.name,
         qty: qtyNum,
-        status: 'Loan',
+        status: 'Reserve',
         where: holdLocation,
         remarks: holdRemarks.trim() ? `[Stock Hold] ${holdRemarks.trim()}` : '[Stock Hold] Reserved from catalog',
         actor: user?.email || 'System',
+        stockDeducted: false,
         ts: serverTimestamp()
       };
 
@@ -411,10 +477,11 @@ export default function Inventory() {
         order: holdOrderId.trim().toUpperCase(),
         item: holdModal.item.name,
         qty: qtyNum,
-        status: 'Loan',
+        status: 'Reserve',
         where: holdLocation,
         remarks: holdRemarks.trim() ? `[Stock Hold] ${holdRemarks.trim()}` : '[Stock Hold] Reserved from catalog',
         actor: user?.email || 'System',
+        stockDeducted: false,
         ts: Date.now()
       };
 
@@ -441,6 +508,95 @@ export default function Inventory() {
     }
   };
 
+  const handleCreateNewItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemDetails.name.trim()) {
+      showToast("Item name is required!", "warn");
+      return;
+    }
+
+    setIsSavingItem(true);
+    setSaveSuccessDetails(null);
+
+    try {
+      const nameClean = newItemDetails.name.trim();
+
+      // Check if item with this name already exists (case-insensitive check)
+      const existing = products.find(p => p.name && p.name.toLowerCase() === nameClean.toLowerCase());
+      if (existing) {
+        showToast(`An item named "${nameClean}" already exists. Feel free to use 'Add Inventory' to increase its quantity!`, "warn");
+        setIsSavingItem(false);
+        return;
+      }
+
+      const qOld = parseInt(newItemDetails.qtyOld) || 0;
+      const qNew = parseInt(newItemDetails.qtyNew) || 0;
+      const qOffice = parseInt(newItemDetails.qtyOffice) || 0;
+      const totalQty = qOld + qNew + qOffice;
+      const stockGoal = parseInt(newItemDetails.goal) || 0;
+      const barcodes = newItemDetails.barcode.trim() ? [newItemDetails.barcode.trim()] : [];
+      const img = newItemDetails.imgUrl.trim() || getFallbackImage(nameClean);
+
+      // Custom document ID to match in both DBs
+      const customId = doc(collection(db, 'inventory')).id;
+
+      const mainLocation = qOffice > qOld && qOffice > qNew ? 'Office' : (qNew > qOld ? 'New warehouse' : 'Old warehouse');
+
+      // 1. Write to Realtime Database
+      await set(ref(rtdb, `inventory/${customId}`), {
+        name: nameClean,
+        qtyOld: qOld,
+        qtyNew: qNew,
+        qtyOffice: qOffice,
+        qty: totalQty,
+        goal: stockGoal,
+        barcodes,
+        img,
+        location: mainLocation,
+        isNew: true,
+        createdAt: Date.now()
+      });
+
+      // 2. Write to Firestore
+      await setDoc(doc(db, 'inventory', customId), {
+        name: nameClean,
+        qtyOld: qOld,
+        qtyNew: qNew,
+        qtyOffice: qOffice,
+        qty: totalQty,
+        goal: stockGoal,
+        barcodes,
+        img,
+        location: mainLocation,
+        isNew: true,
+        createdAt: serverTimestamp()
+      });
+
+      // Show database success state explicitly
+      setSaveSuccessDetails({ name: nameClean, qty: totalQty });
+      showToast(`Successfully added "${nameClean}" to the databases!`, "info");
+      
+      // Auto dismiss modal success screen after 3 seconds, or let user close
+      setTimeout(() => {
+        // Reset states
+        setNewItemDetails({
+          name: '',
+          qtyOld: '0',
+          qtyNew: '0',
+          qtyOffice: '0',
+          goal: '5',
+          barcode: '',
+          imgUrl: ''
+        });
+      }, 500);
+
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'inventory');
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white -m-6 p-6 space-y-6 animate-in fade-in duration-500 pb-24">
       
@@ -448,6 +604,15 @@ export default function Inventory() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e6decf] pb-4">
         <div>
           <h1 className="text-2xl font-black text-[#1E293B] tracking-tight">Adjust Stock</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button 
+            onClick={() => setIsAddItemModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg text-[10.5px] font-extrabold uppercase tracking-wider hover:bg-indigo-700 transition-all hover:shadow shadow-sm active:scale-95 shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add New Item
+          </button>
         </div>
       </header>
 
@@ -483,8 +648,47 @@ export default function Inventory() {
           const displayImg = item.img || getFallbackImage(item.name);
           const itemReservations = reservations.filter(r => r.itemId === item.id && r.status === 'Packing');
           const reservedQty = itemReservations.reduce((acc, curr) => acc + (curr.qty || 0), 0);
-          const availableQty = item.qty || 0;
-          const onHandQty = availableQty + reservedQty;
+          
+          // Get of all loans/rents for this item from statuses
+          const itemLoans = statuses.filter(s => s.item && s.item.toLowerCase() === item.name.toLowerCase() && (s.status === 'Loan' || s.status === 'Rent'));
+          const loanedQty = itemLoans.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+          // Total available stock is the database count minus units
+          const availableQty = Math.max(0, (item.qty || 0) - loanedQty - reservedQty);
+          const onHandQty = (item.qty || 0);
+
+          // Compute dynamic available counts for each individual location
+          const oldWhReserved = itemReservations.filter(r => r.location === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+          const newWhReserved = itemReservations.filter(r => r.location === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+          const officeReserved = itemReservations.filter(r => r.location === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+          const oldWhLoaned = itemLoans.filter(s => s.where === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+          const newWhLoaned = itemLoans.filter(s => s.where === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+          const officeLoaned = itemLoans.filter(s => s.where === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+          let displayQtyOld = Math.max(0, (item.qtyOld || 0) - oldWhLoaned - oldWhReserved);
+          let displayQtyNew = Math.max(0, (item.qtyNew || 0) - newWhLoaned - newWhReserved);
+          let displayQtyOffice = Math.max(0, (item.qtyOffice || 0) - officeLoaned - officeReserved);
+
+          const sumLocs = displayQtyOld + displayQtyNew + displayQtyOffice;
+          if (sumLocs > availableQty) {
+            let gap = sumLocs - availableQty;
+            const fromNew = Math.min(displayQtyNew, gap);
+            displayQtyNew -= fromNew;
+            gap -= fromNew;
+
+            if (gap > 0) {
+              const fromOld = Math.min(displayQtyOld, gap);
+              displayQtyOld -= fromOld;
+              gap -= fromOld;
+            }
+
+            if (gap > 0) {
+              const fromOffice = Math.min(displayQtyOffice, gap);
+              displayQtyOffice -= fromOffice;
+              gap -= fromOffice;
+            }
+          }
           
           return (
             <motion.div 
@@ -525,10 +729,22 @@ export default function Inventory() {
 
               {/* Body Content Section */}
               <div className="px-1 py-3 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   <h3 className="text-[13px] font-bold text-[#1E293B] line-clamp-2 leading-tight">
                     {item.name}
                   </h3>
+
+                  {/* Hero Highlight for Available to Use Stock */}
+                  <div className="bg-emerald-50/80 border border-emerald-100/90 rounded-[14px] p-3 flex items-center justify-between shadow-xs">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider leading-none">Available Stock</span>
+                      <span className="text-[9px] font-bold text-slate-400 mt-0.5 leading-none">Ready for checkout</span>
+                    </div>
+                    <div className="text-right flex items-baseline gap-0.5 leading-none">
+                      <span className="text-2xl font-black text-emerald-600 tracking-tight">{availableQty}</span>
+                      <span className="text-[9px] font-extrabold text-emerald-700 uppercase ml-0.5">units</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Warehousing Locations Layout & Pill Styles matching user screenshot */}
@@ -538,7 +754,7 @@ export default function Inventory() {
                     <span className="flex items-center gap-1 bg-[#F1EFE9] border border-[#E3DCD1] text-[10px] font-extrabold text-slate-600 px-3 py-0.5 rounded-full uppercase tracking-wider">
                       🏫 Old warehouse
                     </span>
-                    <span className="text-xs font-black text-slate-800">{item.qtyOld || 0}</span>
+                    <span className="text-xs font-black text-slate-800">{displayQtyOld}</span>
                   </div>
 
                   {/* New Warehouse */}
@@ -546,7 +762,7 @@ export default function Inventory() {
                     <span className="flex items-center gap-1 bg-[#F1EFE9] border border-[#E3DCD1] text-[10px] font-extrabold text-slate-600 px-3 py-0.5 rounded-full uppercase tracking-wider">
                       🏫 New warehouse
                     </span>
-                    <span className="text-xs font-black text-slate-800">{item.qtyNew || 0}</span>
+                    <span className="text-xs font-black text-slate-800">{displayQtyNew}</span>
                   </div>
 
                   {/* Office */}
@@ -554,7 +770,7 @@ export default function Inventory() {
                     <span className="flex items-center gap-1 bg-[#FEF3C7] border border-[#FDE68A] text-[10px] font-extrabold text-amber-800 px-3 py-0.5 rounded-full uppercase tracking-wider">
                       🏷️ Office
                     </span>
-                    <span className="text-xs font-black text-slate-800">{item.qtyOffice || 0}</span>
+                    <span className="text-xs font-black text-slate-800">{displayQtyOffice}</span>
                   </div>
 
                   {/* Reserved (Dedicated inventory card row display right below Office) */}
@@ -574,9 +790,7 @@ export default function Inventory() {
                 {/* Subtext and Goal */}
                 <div className="text-[10.5px] text-[#8C8273] font-bold tracking-wide flex flex-col gap-0.5">
                   <div className="flex justify-between items-center bg-slate-100/50 p-2 rounded-lg text-slate-700">
-                    <span className={cn(
-                      reservedQty > 0 ? "text-amber-800 font-extrabold" : "text-slate-700"
-                    )}>Available: {availableQty} units</span>
+                    <span className="text-slate-500 text-[10px] uppercase font-extrabold tracking-wider">Safety Target</span>
                     <span>Goal: {item.goal || 0}</span>
                   </div>
                 </div>
@@ -805,15 +1019,60 @@ export default function Inventory() {
                 {/* Deduct Stock From Location Selector */}
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block font-black">Hold Stock From Location</label>
-                  <select 
-                    value={holdLocation} 
-                    onChange={e => setHoldLocation(e.target.value)}
-                    className="w-full bg-[#FCFBF9] border border-[#d8cdbc] rounded-lg p-2.5 text-xs font-bold outline-none cursor-pointer focus:border-amber-500 transition-colors"
-                  >
-                    <option value="Old warehouse">Old warehouse (Available: {holdModal.item.qtyOld || 0})</option>
-                    <option value="New warehouse">New warehouse (Available: {holdModal.item.qtyNew || 0})</option>
-                    <option value="Office">Office (Available: {holdModal.item.qtyOffice || 0})</option>
-                  </select>
+                  {(() => {
+                    const activeItem = holdModal.item;
+                    if (!activeItem) return null;
+
+                    const itemLoans = statuses.filter(s => s.item && s.item.toLowerCase() === activeItem.name.toLowerCase() && (s.status === 'Loan' || s.status === 'Rent'));
+                    const loanedQty = itemLoans.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const oldWhLoaned = itemLoans.filter(s => s.where === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const newWhLoaned = itemLoans.filter(s => s.where === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const officeLoaned = itemLoans.filter(s => s.where === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+                    const itemReservations = reservations.filter(r => r.itemId === activeItem.id && r.status === 'Packing');
+                    const reservedQty = itemReservations.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const oldWhReserved = itemReservations.filter(r => r.location === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const newWhReserved = itemReservations.filter(r => r.location === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const officeReserved = itemReservations.filter(r => r.location === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+                    const availableQtyVal = Math.max(0, (activeItem.qty || 0) - loanedQty - reservedQty);
+
+                    let displayQtyOldVal = Math.max(0, (activeItem.qtyOld || 0) - oldWhLoaned - oldWhReserved);
+                    let displayQtyNewVal = Math.max(0, (activeItem.qtyNew || 0) - newWhLoaned - newWhReserved);
+                    let displayQtyOfficeVal = Math.max(0, (activeItem.qtyOffice || 0) - officeLoaned - officeReserved);
+
+                    const sumLocsVal = displayQtyOldVal + displayQtyNewVal + displayQtyOfficeVal;
+                    if (sumLocsVal > availableQtyVal) {
+                      let gapVal = sumLocsVal - availableQtyVal;
+                      const fromNewVal = Math.min(displayQtyNewVal, gapVal);
+                      displayQtyNewVal -= fromNewVal;
+                      gapVal -= fromNewVal;
+
+                      if (gapVal > 0) {
+                        const fromOldVal = Math.min(displayQtyOldVal, gapVal);
+                        displayQtyOldVal -= fromOldVal;
+                        gapVal -= fromOldVal;
+                      }
+
+                      if (gapVal > 0) {
+                        const fromOfficeVal = Math.min(displayQtyOfficeVal, gapVal);
+                        displayQtyOfficeVal -= fromOfficeVal;
+                        gapVal -= fromOfficeVal;
+                      }
+                    }
+
+                    return (
+                      <select 
+                        value={holdLocation} 
+                        onChange={e => setHoldLocation(e.target.value)}
+                        className="w-full bg-[#FCFBF9] border border-[#d8cdbc] rounded-lg p-2.5 text-xs font-bold outline-none cursor-pointer focus:border-amber-500 transition-colors"
+                      >
+                        <option value="Old warehouse">Old warehouse (Available: {displayQtyOldVal})</option>
+                        <option value="New warehouse">New warehouse (Available: {displayQtyNewVal})</option>
+                        <option value="Office">Office (Available: {displayQtyOfficeVal})</option>
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 {/* Client Organization Name */}
@@ -865,6 +1124,178 @@ export default function Inventory() {
                   </button>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isAddItemModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsAddItemModalOpen(false);
+                setSaveSuccessDetails(null);
+              }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-xl bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden font-sans text-slate-800 animate-in zoom-in-95 duration-150"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-slate-800 tracking-tight text-lg uppercase tracking-[0.1em]">Catalog Registry</h2>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 text-left">Define a Brand New Inventory SKU</p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsAddItemModalOpen(false);
+                    setSaveSuccessDetails(null);
+                  }} 
+                  className="p-2 hover:bg-slate-50 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              {isSavingItem ? (
+                <div className="p-12 flex flex-col items-center justify-center space-y-4">
+                  <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-xs font-black text-slate-700 uppercase tracking-widest animate-pulse">Syncing to cloud databases...</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Writing to Firestore & Realtime Databases</p>
+                </div>
+              ) : saveSuccessDetails ? (
+                <div className="p-8 text-center flex flex-col items-center space-y-5">
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200 shadow-sm">
+                    <BookmarkCheck className="w-8 h-8 stroke-[2px]" />
+                  </div>
+                  <div>
+                    <h3 className="text-emerald-800 font-extrabold uppercase tracking-wide text-[11px] mb-1">Database Sync Successful</h3>
+                    <h2 className="text-slate-800 font-black text-lg px-4 truncate max-w-md">{saveSuccessDetails.name}</h2>
+                    <p className="text-slate-500 text-xs mt-1">Successfully inserted and mapped SKU into the active inventory databases with an initial stock of <strong className="font-extrabold text-slate-800">{saveSuccessDetails.qty}</strong> units.</p>
+                  </div>
+
+                  <div className="w-full bg-[#FAF8F5] border border-emerald-100 rounded-lg p-3 text-left">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span>Status</span>
+                      <span className="text-emerald-600">● Live & Synced</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 w-full pt-2">
+                    <button 
+                      onClick={() => {
+                        setSaveSuccessDetails(null);
+                      }}
+                      className="flex-1 py-3 border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 rounded font-bold text-[10.5px] uppercase tracking-widest active:scale-95 transition-all"
+                    >
+                      Register Another SKU
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setIsAddItemModalOpen(false);
+                        setSaveSuccessDetails(null);
+                      }}
+                      className="flex-1 py-3 bg-slate-900 text-white hover:bg-slate-800 rounded font-bold text-[10.5px] uppercase tracking-widest active:scale-95 transition-all shadow-md"
+                    >
+                      Done & Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleCreateNewItem} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                  
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Item Name *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newItemDetails.name}
+                      onChange={e => setNewItemDetails({...newItemDetails, name: e.target.value})}
+                      placeholder="e.g. Bambu Lab X1-Carbon 3D Printer" 
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 text-left">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Qty Old WH</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={newItemDetails.qtyOld}
+                        onChange={e => setNewItemDetails({...newItemDetails, qtyOld: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Qty New WH</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={newItemDetails.qtyNew}
+                        onChange={e => setNewItemDetails({...newItemDetails, qtyNew: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Qty Office</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={newItemDetails.qtyOffice}
+                        onChange={e => setNewItemDetails({...newItemDetails, qtyOffice: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-left">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Alert Threshold (Goal)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={newItemDetails.goal}
+                        onChange={e => setNewItemDetails({...newItemDetails, goal: e.target.value})}
+                        placeholder="5" 
+                        className="w-full bg-slate-50 border border-slate-100 text-amber-900 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-amber-100 outline-none"
+                      />
+                      <p className="text-[8.5px] text-slate-400 italic">Alert triggers when stock falls below this number</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Barcode/SKU Code (Optional)</label>
+                      <input 
+                        type="text" 
+                        value={newItemDetails.barcode}
+                        onChange={e => setNewItemDetails({...newItemDetails, barcode: e.target.value})}
+                        placeholder="e.g. 506085189" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Image URL (Optional)</label>
+                    <input 
+                      type="text" 
+                      value={newItemDetails.imgUrl}
+                      onChange={e => setNewItemDetails({...newItemDetails, imgUrl: e.target.value})}
+                      placeholder="Leave blank for automatic robotics/STEM asset assignment" 
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded font-bold text-[11px] uppercase tracking-widest mt-6 shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
+                    Register Catalog SKU & Quantities
+                  </button>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

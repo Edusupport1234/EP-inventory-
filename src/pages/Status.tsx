@@ -17,16 +17,18 @@ interface StatusRecord {
   order: string;
   item: string;
   qty: number;
-  status: 'Loan' | 'Rent' | 'Reserve';
+  status: 'Loan' | 'Rent' | 'Reserve' | 'Completed';
   where: 'Client' | 'On the way back' | 'Office' | string;
   remarks?: string;
   actor?: string;
   editor?: string;
+  stockDeducted?: boolean;
   updatedAt?: any;
 }
 
 export default function Status() {
   const [search, setSearch] = useState('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<'All' | 'Loan' | 'Rent' | 'Reserve' | 'Completed'>('All');
   const [statuses, setStatuses] = useState<StatusRecord[]>([]);
   const [user, setUser] = useState(auth.currentUser);
   
@@ -38,7 +40,7 @@ export default function Status() {
   const [order, setOrder] = useState('');
   const [item, setItem] = useState('');
   const [qty, setQty] = useState('1');
-  const [statusType, setStatusType] = useState<'Loan' | 'Rent' | 'Reserve'>('Loan');
+  const [statusType, setStatusType] = useState<'Loan' | 'Rent' | 'Reserve' | 'Completed'>('Loan');
   const [where, setWhere] = useState('Client');
   const [remarks, setRemarks] = useState('');
 
@@ -327,8 +329,8 @@ export default function Status() {
       if (editingId) {
         // Edit flow
 
-        // 1. Revert original stock if it was of type 'Reserve'
-        if (originalRecord && originalRecord.status === 'Reserve') {
+        // 1. Revert original stock if it was of type 'Reserve', 'Loan', or 'Rent'
+        if (originalRecord && ['Reserve', 'Loan', 'Rent'].includes(originalRecord.status)) {
           const oldProduct = products.find(p => p.name.toLowerCase() === originalRecord.item.toLowerCase());
           if (oldProduct) {
             const oldField = fieldMap[originalRecord.where] || 'qtyOld';
@@ -358,69 +360,74 @@ export default function Status() {
           }
         }
 
-        // 2. Deduct new stock if the updated type is 'Reserve'
-        if (statusType === 'Reserve') {
+        // 2. Deduct new stock if the updated type is 'Loan' or 'Rent'
+        if (['Reserve', 'Loan', 'Rent'].includes(statusType)) {
           const newProduct = products.find(p => p.name.toLowerCase() === itemStr.toLowerCase());
           if (newProduct) {
             const newField = fieldMap[where] || 'qtyOld';
-            
-            // Avoid using stale state values during sequential calculations by adjusting local readings
-            let tempLocQty = newProduct[newField] || 0;
-            let tempTotalQty = newProduct.qty || 0;
+            const shouldDeductImmediately = ['Loan', 'Rent'].includes(statusType);
 
-            const oldProductOfSameName = originalRecord && products.find(p => p.name.toLowerCase() === originalRecord.item.toLowerCase());
-            if (originalRecord && originalRecord.status === 'Reserve' && oldProductOfSameName && oldProductOfSameName.id === newProduct.id) {
-              const oldField = fieldMap[originalRecord.where] || 'qtyOld';
-              if (oldField === newField) {
-                tempLocQty += originalRecord.qty;
+            if (shouldDeductImmediately) {
+              // Avoid using stale state values during sequential calculations by adjusting local readings
+              let tempLocQty = newProduct[newField] || 0;
+              let tempTotalQty = newProduct.qty || 0;
+
+              const oldProductOfSameName = originalRecord && products.find(p => p.name.toLowerCase() === originalRecord.item.toLowerCase());
+              if (originalRecord && ['Reserve', 'Loan', 'Rent'].includes(originalRecord.status) && originalRecord.stockDeducted !== false && oldProductOfSameName && oldProductOfSameName.id === newProduct.id) {
+                const oldField = fieldMap[originalRecord.where] || 'qtyOld';
+                if (oldField === newField) {
+                  tempLocQty += originalRecord.qty;
+                }
+                tempTotalQty += originalRecord.qty;
               }
-              tempTotalQty += originalRecord.qty;
-            }
 
-            const finalLocQty = Math.max(0, tempLocQty - qtyNum);
-            const finalTotalQty = Math.max(0, tempTotalQty - qtyNum);
+              const finalLocQty = Math.max(0, tempLocQty - qtyNum);
+              const finalTotalQty = Math.max(0, tempTotalQty - qtyNum);
 
-            try {
-              await updateDoc(doc(db, 'inventory', newProduct.id), {
-                [newField]: finalLocQty,
-                qty: finalTotalQty
-              });
-              await update(ref(rtdb, `inventory/${newProduct.id}`), {
-                [newField]: finalLocQty,
-                qty: finalTotalQty
-              });
-            } catch (err_deduct) {
-              console.warn("Status Edit: Deducting new stock failed:", err_deduct);
+              try {
+                await updateDoc(doc(db, 'inventory', newProduct.id), {
+                  [newField]: finalLocQty,
+                  qty: finalTotalQty
+                });
+                await update(ref(rtdb, `inventory/${newProduct.id}`), {
+                  [newField]: finalLocQty,
+                  qty: finalTotalQty
+                });
+              } catch (err_deduct) {
+                console.warn("Status Edit: Deducting new stock failed:", err_deduct);
+              }
             }
 
             // Create/update matching reservation document
             const reservationFirestore = {
               orderId: orderStr.toUpperCase(),
-              clientName: 'Status Reserve',
+              clientName: `Status ${statusType}`,
               itemId: newProduct.id,
               itemName: newProduct.name,
               qty: qtyNum,
               rackId: '',
               rackLevel: -1,
               status: 'Packing',
-              remarks: remarks.trim() ? `[Status Reserve] ${remarks.trim()}` : '[Status Reserve] Reserved from status card',
+              remarks: remarks.trim() ? `[Status ${statusType}] ${remarks.trim()}` : `[Status ${statusType}] Reserved from status card`,
               location: where,
               actor: actor,
+              stockDeducted: shouldDeductImmediately,
               ts: serverTimestamp()
             };
 
             const reservationRtdb = {
               orderId: orderStr.toUpperCase(),
-              clientName: 'Status Reserve',
+              clientName: `Status ${statusType}`,
               itemId: newProduct.id,
               itemName: newProduct.name,
               qty: qtyNum,
               rackId: '',
               rackLevel: -1,
               status: 'Packing',
-              remarks: remarks.trim() ? `[Status Reserve] ${remarks.trim()}` : '[Status Reserve] Reserved from status card',
+              remarks: remarks.trim() ? `[Status ${statusType}] ${remarks.trim()}` : `[Status ${statusType}] Reserved from status card`,
               location: where,
               actor: actor,
+              stockDeducted: shouldDeductImmediately,
               ts: Date.now()
             };
 
@@ -442,6 +449,7 @@ export default function Status() {
           where,
           remarks,
           editor: actor,
+          stockDeducted: ['Loan', 'Rent'].includes(statusType),
           updatedAt: serverTimestamp()
         };
 
@@ -453,6 +461,7 @@ export default function Status() {
           where,
           remarks,
           editor: actor,
+          stockDeducted: ['Loan', 'Rent'].includes(statusType),
           updatedAt: Date.now()
         };
 
@@ -466,56 +475,63 @@ export default function Status() {
         // Create flow
         const targetId = doc(collection(db, 'statuses')).id;
 
-        // 1. If status type is 'Reserve', deduct inventory stock and register a reservation
-        if (statusType === 'Reserve') {
+        // 1. If status type is 'Reserve', 'Loan', or 'Rent', register a reservation
+        // But only deduct stock immediately for 'Loan' or 'Rent'.
+        if (['Reserve', 'Loan', 'Rent'].includes(statusType)) {
           const matchingProduct = products.find(p => p.name.toLowerCase() === itemStr.toLowerCase());
           if (matchingProduct) {
             const field = fieldMap[where] || 'qtyOld';
             const currentLocQty = matchingProduct[field] || 0;
-            const newLocQty = Math.max(0, currentLocQty - qtyNum);
-            const newTotalQty = Math.max(0, (matchingProduct.qty || 0) - qtyNum);
+            const shouldDeductImmediately = ['Loan', 'Rent'].includes(statusType);
 
-            try {
-              await updateDoc(doc(db, 'inventory', matchingProduct.id), {
-                [field]: newLocQty,
-                qty: newTotalQty
-              });
-              await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
-                [field]: newLocQty,
-                qty: newTotalQty
-              });
-            } catch (err_deduct) {
-              console.warn("Status Create: Deducting stock failed:", err_deduct);
+            if (shouldDeductImmediately) {
+              const newLocQty = Math.max(0, currentLocQty - qtyNum);
+              const newTotalQty = Math.max(0, (matchingProduct.qty || 0) - qtyNum);
+
+              try {
+                await updateDoc(doc(db, 'inventory', matchingProduct.id), {
+                  [field]: newLocQty,
+                  qty: newTotalQty
+                });
+                await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
+                  [field]: newLocQty,
+                  qty: newTotalQty
+                });
+              } catch (err_deduct) {
+                console.warn("Status Create: Deducting stock failed:", err_deduct);
+              }
             }
 
             // Also register a reservation
             const reservationFirestore = {
               orderId: orderStr.toUpperCase(),
-              clientName: 'Status Reserve',
+              clientName: `Status ${statusType}`,
               itemId: matchingProduct.id,
               itemName: matchingProduct.name,
               qty: qtyNum,
               rackId: '',
               rackLevel: -1,
               status: 'Packing',
-              remarks: remarks.trim() ? `[Status Reserve] ${remarks.trim()}` : '[Status Reserve] Reserved from status',
+              remarks: remarks.trim() ? `[Status ${statusType}] ${remarks.trim()}` : `[Status ${statusType}] Reserved from status`,
               location: where,
               actor: actor,
+              stockDeducted: shouldDeductImmediately,
               ts: serverTimestamp()
             };
 
             const reservationRtdb = {
               orderId: orderStr.toUpperCase(),
-              clientName: 'Status Reserve',
+              clientName: `Status ${statusType}`,
               itemId: matchingProduct.id,
               itemName: matchingProduct.name,
               qty: qtyNum,
               rackId: '',
               rackLevel: -1,
               status: 'Packing',
-              remarks: remarks.trim() ? `[Status Reserve] ${remarks.trim()}` : '[Status Reserve] Reserved from status',
+              remarks: remarks.trim() ? `[Status ${statusType}] ${remarks.trim()}` : `[Status ${statusType}] Reserved from status`,
               location: where,
               actor: actor,
+              stockDeducted: shouldDeductImmediately,
               ts: Date.now()
             };
 
@@ -537,6 +553,7 @@ export default function Status() {
           where,
           remarks,
           actor,
+          stockDeducted: ['Loan', 'Rent'].includes(statusType),
           ts: serverTimestamp()
         };
 
@@ -548,6 +565,7 @@ export default function Status() {
           where,
           remarks,
           actor,
+          stockDeducted: ['Loan', 'Rent'].includes(statusType),
           ts: Date.now()
         };
 
@@ -572,34 +590,37 @@ export default function Status() {
   };
 
   const handleDelete = async (id: string) => {
-    // Revert inventory stock if this were a reserve record
+    // Revert inventory stock if this were a reserve/loan/rent record
     const record = statuses.find(s => s.id === id);
-    if (record && record.status === 'Reserve') {
-      const matchingProduct = products.find(p => p.name.toLowerCase() === record.item.toLowerCase());
-      if (matchingProduct) {
-        const fieldMap: any = { 
-          'Old warehouse': 'qtyOld', 
-          'New warehouse': 'qtyNew', 
-          'Office': 'qtyOffice' 
-        };
-        const field = fieldMap[record.where] || 'qtyOld';
-        const currentLocQty = matchingProduct[field] || 0;
-        const restoredLocQty = currentLocQty + record.qty;
-        const restoredTotalQty = (matchingProduct.qty || 0) + record.qty;
+    if (record && ['Reserve', 'Loan', 'Rent'].includes(record.status)) {
+      const autoRestockOnDelete = localStorage.getItem('settings_autoRestockOnDelete') !== 'false';
+      if (autoRestockOnDelete && record.stockDeducted !== false) {
+        const matchingProduct = products.find(p => p.name.toLowerCase() === record.item.toLowerCase());
+        if (matchingProduct) {
+          const fieldMap: any = { 
+            'Old warehouse': 'qtyOld', 
+            'New warehouse': 'qtyNew', 
+            'Office': 'qtyOffice' 
+          };
+          const field = fieldMap[record.where] || 'qtyOld';
+          const currentLocQty = matchingProduct[field] || 0;
+          const restoredLocQty = currentLocQty + record.qty;
+          const restoredTotalQty = (matchingProduct.qty || 0) + record.qty;
 
-        try {
-          // Revert Firestore
-          await updateDoc(doc(db, 'inventory', matchingProduct.id), {
-            [field]: restoredLocQty,
-            qty: restoredTotalQty
-          });
-          // Revert RTDB
-          await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
-            [field]: restoredLocQty,
-            qty: restoredTotalQty
-          });
-        } catch (err_revert) {
-          console.warn("Status Delete: Reverting stock failed:", err_revert);
+          try {
+            // Revert Firestore
+            await updateDoc(doc(db, 'inventory', matchingProduct.id), {
+              [field]: restoredLocQty,
+              qty: restoredTotalQty
+            });
+            // Revert RTDB
+            await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
+              [field]: restoredLocQty,
+              qty: restoredTotalQty
+            });
+          } catch (err_revert) {
+            console.warn("Status Delete: Reverting stock failed:", err_revert);
+          }
         }
       }
 
@@ -624,15 +645,82 @@ export default function Status() {
     }
   };
 
+  const handleConfirmReservation = async (record: StatusRecord) => {
+    try {
+      // 1. Subtract from physical location stock and overall total in Firestore & RTDB
+      const matchingProduct = products.find(p => p.name.toLowerCase() === record.item.toLowerCase());
+      if (matchingProduct) {
+        const fieldMap: { [key: string]: string } = { 
+          'Old warehouse': 'qtyOld', 
+          'New warehouse': 'qtyNew', 
+          'Office': 'qtyOffice' 
+        };
+        const field = fieldMap[record.where] || 'qtyOld';
+        const currentLocQty = matchingProduct[field] || 0;
+
+        const newLocQty = Math.max(0, currentLocQty - record.qty);
+        const newTotalQty = Math.max(0, (matchingProduct.qty || 0) - record.qty);
+
+        try {
+          await updateDoc(doc(db, 'inventory', matchingProduct.id), {
+            [field]: newLocQty,
+            qty: newTotalQty
+          });
+          await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
+            [field]: newLocQty,
+            qty: newTotalQty
+          });
+        } catch (err_deduct) {
+          console.warn("Status Confirm Sale: Deducting physical stock failed:", err_deduct);
+        }
+      }
+
+      // 2. Delete the companion reservation from active reservations collection so it no longer consumes layout/totals
+      try {
+        await deleteDoc(doc(db, 'reservations', record.id));
+        await remove(ref(rtdb, `reservations/${record.id}`));
+      } catch (err_res_del) {
+        console.warn("Companion reservation deletion failed:", err_res_del);
+      }
+
+      // 3. Update the parent status record to represent a Completed/Finalized sale (deducted)
+      const updatedStatusPayload = {
+        status: 'Completed',
+        remarks: record.remarks ? `${record.remarks} [Confirmed Sale & Stocks Shipped]` : '[Confirmed Sale & Stocks Shipped]',
+        stockDeducted: true,
+        updatedAt: serverTimestamp()
+      };
+
+      const updatedStatusPayloadRtdb = {
+        status: 'Completed',
+        remarks: record.remarks ? `${record.remarks} [Confirmed Sale & Stocks Shipped]` : '[Confirmed Sale & Stocks Shipped]',
+        stockDeducted: true,
+        updatedAt: Date.now()
+      };
+
+      await updateDoc(doc(db, 'statuses', record.id), updatedStatusPayload);
+      try {
+        await update(ref(rtdb, `statuses/${record.id}`), updatedStatusPayloadRtdb);
+      } catch (e) {}
+
+      showToast('Sale Confirmed! Reserved count has returned to zero.');
+    } catch (error) {
+      console.error(error);
+      showToast('Error confirming sale reservation', 'error');
+    }
+  };
+
   const filteredStatuses = statuses.filter(s => {
     const q = search.toLowerCase();
-    return (
+    const matchesSearch = (
       (s.order || '').toLowerCase().includes(q) ||
       (s.item || '').toLowerCase().includes(q) ||
       (s.remarks || '').toLowerCase().includes(q) ||
       (s.where || '').toLowerCase().includes(q) ||
       (s.status || '').toLowerCase().includes(q)
     );
+    const matchesFilter = selectedTypeFilter === 'All' || s.status === selectedTypeFilter;
+    return matchesSearch && matchesFilter;
   });
 
   return (
@@ -700,6 +788,41 @@ export default function Status() {
             </div>
           </div>
 
+          {/* Category Tabs Filter */}
+          <div className="flex flex-wrap gap-2 pb-2">
+            {[
+              { id: 'All', label: '🗂️ All Records' },
+              { id: 'Loan', label: '🤝 Loans' },
+              { id: 'Rent', label: '💳 Rents' },
+              { id: 'Reserve', label: '🔖 Reservations' },
+              { id: 'Completed', label: '✅ Sold & Completed' }
+            ].map((tab) => {
+              const isActive = selectedTypeFilter === tab.id;
+              const count = tab.id === 'All' 
+                ? statuses.length 
+                : statuses.filter(s => s.status === tab.id).length;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setSelectedTypeFilter(tab.id as any)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all duration-200 active:scale-95 border ${
+                    isActive 
+                      ? 'bg-teal-600 border-teal-600 text-white shadow-sm' 
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                    isActive ? 'bg-teal-700/60 text-teal-50' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* Main Grid List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStatuses.map((record, idx) => {
@@ -763,43 +886,58 @@ export default function Status() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2.5 mt-5 pt-3 border-t border-slate-100 justify-end">
-                    <button 
-                      onClick={() => openEditModal(record)}
-                      className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all active:scale-95"
-                      title="Edit Status"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    {deleteConfirmId === record.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <button 
-                          onClick={() => {
-                            handleDelete(record.id);
-                            setDeleteConfirmId(null);
-                          }}
-                          className="px-2.5 py-1.5 bg-red-600 border border-red-600 rounded-lg text-white font-black text-[9px] uppercase tracking-wider hover:bg-red-700 active:scale-95 transition-all shadow-sm"
-                          title="Click again to confirm deletion"
+                  <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3 mt-5">
+                    <div className="flex-1">
+                      {record.status === 'Reserve' && (
+                        <button
+                          onClick={() => handleConfirmReservation(record)}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-extrabold text-[10px] uppercase tracking-wider transition-all shadow-sm active:scale-95"
+                          title="Confirm order sale and clear reservation hold"
                         >
-                          Confirm
+                          <Check className="w-3.5 h-3.5 stroke-[3px]" />
+                          <span>Confirm Sale</span>
                         </button>
-                        <button 
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-600 text-[9px] font-bold uppercase hover:bg-slate-200 active:scale-95 transition-all"
-                          title="Cancel"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
                       <button 
-                        onClick={() => setDeleteConfirmId(record.id)}
-                        className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all active:scale-95"
-                        title="Delete Status"
+                        onClick={() => openEditModal(record)}
+                        className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all active:scale-95 text-xs font-bold shrink-0"
+                        title="Edit Status"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Edit3 className="w-4 h-4" />
                       </button>
-                    )}
+                      {deleteConfirmId === record.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <button 
+                            onClick={() => {
+                              handleDelete(record.id);
+                              setDeleteConfirmId(null);
+                            }}
+                            className="px-2.5 py-1.5 bg-red-600 border border-red-600 rounded-lg text-white font-black text-[9px] uppercase tracking-wider hover:bg-red-700 active:scale-95 transition-all shadow-sm leading-none shrink-0"
+                            title="Click again to confirm deletion"
+                          >
+                            Confirm
+                          </button>
+                          <button 
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="px-2 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-600 text-[9px] font-bold uppercase hover:bg-slate-200 active:scale-95 transition-all leading-none shrink-0"
+                            title="Cancel"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setDeleteConfirmId(record.id)}
+                          className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all active:scale-95 shrink-0"
+                          title="Delete Status"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               );
@@ -838,8 +976,13 @@ export default function Status() {
               {products.map((itemObj, idx) => {
                 const itemRes = reservations.filter(r => r.itemId === itemObj.id && r.status === 'Packing');
                 const reservedQty = itemRes.reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                const availableQty = itemObj.qty || 0;
-                const totalOnHand = availableQty + reservedQty;
+                
+                // Get all active loans/rents from statuses collection
+                const itemLoans = statuses.filter(s => s.item && s.item.toLowerCase() === itemObj.name.toLowerCase() && (s.status === 'Loan' || s.status === 'Rent'));
+                const loanedQty = itemLoans.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+
+                const availableQty = Math.max(0, (itemObj.qty || 0) - loanedQty - reservedQty);
+                const totalOnHand = (itemObj.qty || 0);
 
                 return (
                   <div key={itemObj.id ? `live-prod-${itemObj.id}-${idx}` : `live-prod-idx-${idx}`} className="p-3 bg-slate-50 border border-slate-100 rounded-xl transition-all hover:border-slate-300">

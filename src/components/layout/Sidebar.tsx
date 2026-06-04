@@ -8,16 +8,16 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  onLogout?: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'inventory', icon: Package, label: 'Inventory' },
     { id: 'locations', icon: MapPin, label: 'Location' },
     { id: 'status', icon: ClipboardList, label: 'Status' },
     { id: 'history', icon: History, label: 'History' },
-    { id: 'analytics', icon: BarChart3, label: 'Analytics' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -93,12 +93,9 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: 
             ))}
           </nav>
 
-          {/* Bottom Menu */}
-          <div className="p-3 border-t border-slate-100">
-            <button className="w-full flex items-center p-3 text-slate-500 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all">
-              <LogOut className="w-5 h-5 shrink-0" />
-              {isOpen && <span className="ml-3 font-medium">Logout</span>}
-            </button>
+          {/* Bottom Branding Info */}
+          <div className="p-4 border-t border-slate-100 text-center select-none">
+            <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] block leading-none">StratosCore v1.0.4</span>
           </div>
         </div>
       </aside>

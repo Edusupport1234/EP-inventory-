@@ -1,11 +1,15 @@
 import React from 'react';
-import { Search, Bell, User, Menu } from 'lucide-react';
+import { Search, Bell, User, Menu, LogOut } from 'lucide-react';
 
 interface NavbarProps {
   toggleSidebar: () => void;
+  onLogout?: () => void;
 }
 
-export default function Navbar({ toggleSidebar }: NavbarProps) {
+export default function Navbar({ toggleSidebar, onLogout }: NavbarProps) {
+  const username = localStorage.getItem('epedu_username') || 'Admin User';
+  const initial = username.substring(0, 2).toUpperCase();
+
   return (
     <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
@@ -32,17 +36,30 @@ export default function Navbar({ toggleSidebar }: NavbarProps) {
           <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
         </button>
         
-        <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+        <div className="h-8 w-[1px] bg-slate-200 mx-1"></div>
         
-        <button className="flex items-center gap-3 p-1.5 hover:bg-slate-100 rounded-full transition-all">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
-            <User className="w-4 h-4 text-blue-600" />
+        {/* Dynamic User Profile Indicator */}
+        <div className="flex items-center gap-2.5 p-1 px-2.5 bg-slate-50 border border-slate-100 rounded-xl select-none">
+          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-black uppercase shadow-xs">
+            {initial}
           </div>
-          <div className="hidden sm:block text-left mr-2">
-            <p className="text-xs font-semibold text-slate-800 leading-none">Admin User</p>
-            <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Super Manager</p>
+          <div className="hidden sm:block text-left mr-1">
+            <p className="text-xs font-bold text-slate-800 leading-none">{username}</p>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1.5">Super Manager</p>
           </div>
-        </button>
+        </div>
+
+        {/* Unified Top-Right Logout Button */}
+        {onLogout && (
+          <button 
+            onClick={onLogout}
+            className="flex items-center gap-1.5 p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-100 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Sign Out of StratosCore"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span className="text-[10px] font-black uppercase tracking-wider hidden md:inline pr-1">Logout</span>
+          </button>
+        )}
       </div>
     </header>
   );
