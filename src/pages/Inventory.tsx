@@ -43,6 +43,11 @@ export default function Inventory() {
   const [deleteModal, setDeleteModal] = useState<{ open: boolean, item: any }>({ open: false, item: null });
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+  // Camera image address prompt states
+  const [isImagePromptOpen, setIsImagePromptOpen] = useState(false);
+  const [editingImageItem, setEditingImageItem] = useState<any | null>(null);
+  const [newImageLink, setNewImageLink] = useState('');
+
   // Form Inputs
   const [adjAmount, setAdjAmount] = useState('1');
   const [adjLocation, setAdjLocation] = useState('Old warehouse');
@@ -392,6 +397,39 @@ export default function Inventory() {
     }
   };
 
+  const handleUpdateImageLink = async () => {
+    if (!editingImageItem) return;
+    try {
+      const updatedImg = newImageLink.trim();
+      if (!updatedImg) {
+        showToast("Please enter a valid image address link or cancel.", "warn");
+        return;
+      }
+      
+      // Update in Firestore
+      await updateDoc(doc(db, 'inventory', editingImageItem.id), {
+        img: updatedImg
+      });
+
+      // Update in Realtime Database
+      try {
+        await update(ref(rtdb, `inventory/${editingImageItem.id}`), {
+          img: updatedImg
+        });
+      } catch (e) {
+        console.warn("RTDB sync error during image update:", e);
+      }
+
+      showToast(`Successfully updated image for ${editingImageItem.name}`, "info");
+      setIsImagePromptOpen(false);
+      setEditingImageItem(null);
+      setNewImageLink('');
+    } catch (error) {
+      console.error("Error updating image:", error);
+      showToast("Failed to update image link. Please check permissions.", "error");
+    }
+  };
+
   const handleCreateHold = async () => {
     if (!holdModal.item || !holdClientName || !holdQty || !holdOrderId) {
       showToast("Please fill in Order ID, Client Name and Quantity", "warn");
@@ -708,9 +746,18 @@ export default function Inventory() {
                 />
                 
                 {/* Image Trigger Icon left top */}
-                <div className="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur border border-[#e2d7c5] p-1.5 rounded-lg shadow-sm">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setEditingImageItem(item);
+                    setNewImageLink(item.img || '');
+                    setIsImagePromptOpen(true);
+                  }}
+                  className="absolute top-2.5 left-2.5 bg-white/95 hover:bg-slate-50 border border-[#e2d7c5] p-1.5 rounded-lg shadow-sm cursor-pointer z-10 transition-colors"
+                  title="Update Image Address Link"
+                >
                   <Camera className="w-3.5 h-3.5 text-slate-700" />
-                </div>
+                </button>
 
                 {/* Overlaid View Image Button right top */}
                 <button 
@@ -774,13 +821,13 @@ export default function Inventory() {
                   </div>
 
                   {/* Reserved (Dedicated inventory card row display right below Office) */}
-                  <div className="flex items-center justify-between bg-amber-50/20 border border-amber-100/50 rounded-xl px-1.5 py-0.5">
-                    <span className="flex items-center gap-1 bg-amber-50 border border-amber-200/60 text-[10.5px] font-extrabold text-amber-800 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 bg-amber-50 border border-amber-200/60 text-[10px] font-extrabold text-amber-800 px-3 py-0.5 rounded-full uppercase tracking-wider">
                       🔖 Reserved
                     </span>
                     <span className={cn(
                       "text-xs font-black",
-                      reservedQty > 0 ? "text-amber-600 font-extrabold" : "text-slate-400 font-medium"
+                      reservedQty > 0 ? "text-amber-600 font-extrabold" : "text-slate-400"
                     )}>
                       {reservedQty || 0}
                     </span>
@@ -944,6 +991,87 @@ export default function Inventory() {
                 <X className="w-4 h-4" />
               </button>
               <img src={previewImage} alt="Preview" className="max-w-full max-h-[80vh] object-contain block" referrerPolicy="no-referrer" />
+            </motion.div>
+          </div>
+        )}
+
+        {/* Custom Image Address Update Modal */}
+        {isImagePromptOpen && editingImageItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => {
+                setIsImagePromptOpen(false);
+                setEditingImageItem(null);
+              }} 
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-[#EEE6D8] overflow-hidden z-10"
+            >
+              {/* Modal Header */}
+              <div className="p-4 border-b border-[#F2EDE2] flex items-center justify-between bg-[#FAF8F5]">
+                <h3 className="font-bold text-[#1E293B] text-[11px] uppercase tracking-widest flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-[#8C8273]" />
+                  <span>Update Stock Image URL</span>
+                </h3>
+                <button 
+                  onClick={() => {
+                    setIsImagePromptOpen(false);
+                    setEditingImageItem(null);
+                  }} 
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 space-y-4 font-sans">
+                <div className="bg-[#FAF8F5] p-3 rounded-xl border border-[#EDE7DF]">
+                  <p className="text-[9px] text-[#8C8273] font-black uppercase tracking-wider">{editingImageItem.name}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Provide an image web link (address URL) to visually represent this item in the inventory catalog.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block font-black">Image Address Link</label>
+                  <input 
+                    type="url" 
+                    placeholder="https://example.com/image.jpg"
+                    value={newImageLink} 
+                    onChange={e => setNewImageLink(e.target.value)} 
+                    className="w-full bg-[#FCFBF9] border border-[#d8cdbc] rounded-lg p-2.5 text-xs font-semibold outline-none focus:border-[#beb29c] transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Action Footer */}
+              <div className="p-4 bg-[#FAF8F5] border-t border-[#F2EDE2] flex gap-2.5 justify-end">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsImagePromptOpen(false);
+                    setEditingImageItem(null);
+                  }} 
+                  className="px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wider border border-[#d8cdbc] hover:bg-slate-50 text-slate-500 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleUpdateImageLink}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-extrabold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-95"
+                >
+                  Submit
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

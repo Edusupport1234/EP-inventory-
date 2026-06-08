@@ -771,6 +771,15 @@ export default function Dashboard() {
           <p className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">StratosCore Integration Hub</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <a
+            href="https://imagekit.io/dashboard/media-library/L0VQRURVIElOVkVOVE9SWSA"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10.5px] font-extrabold uppercase tracking-wider transition-all hover:shadow shadow-sm active:scale-95 shrink-0"
+          >
+            <ArrowUpRight className="w-3.5 h-3.5" />
+            ImageKit Link
+          </a>
           <button 
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[10.5px] font-extrabold uppercase tracking-wider hover:bg-slate-800 transition-all hover:shadow shadow-sm active:scale-95 shrink-0"
