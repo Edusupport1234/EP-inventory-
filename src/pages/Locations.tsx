@@ -11,6 +11,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { writeBatch, setDoc } from 'firebase/firestore';
+import { checkViewerAndAlert } from '@/src/lib/auth-alert';
 
 interface RackData {
   id: string;
@@ -105,7 +106,7 @@ export function checkRackOverlap(
 
 export interface SketchItem {
   id: string;
-  type: 'wall' | 'window' | 'door';
+  type: 'wall' | 'window' | 'door' | 'toilet_bowl';
   position: [number, number, number];
   size: [number, number, number]; // [width, height, thickness]
   rotation: number; // Y-rotation angle in radians
@@ -161,6 +162,51 @@ function SketchItemMesh({
               roughness={0.1} 
               metalness={0.9} 
             />
+          </mesh>
+        </group>
+      );
+    } else if (item.type === 'toilet_bowl') {
+      return (
+        <group>
+          {/* Base / Pedestal */}
+          <mesh castShadow receiveShadow position={[0, -0.25, 0.05]}>
+            <cylinderGeometry args={[0.18, 0.22, 0.3, 16]} />
+            <meshStandardMaterial 
+              color={isSelected ? '#3b82f6' : (hovered ? '#f1f5f9' : '#f8fafc')} 
+              roughness={0.1} 
+              metalness={0.05} 
+            />
+          </mesh>
+          {/* Main Bowl */}
+          <mesh castShadow receiveShadow position={[0, -0.05, 0.1]}>
+            <cylinderGeometry args={[0.24, 0.18, 0.2, 16]} />
+            <meshStandardMaterial 
+              color={isSelected ? '#3b82f6' : (hovered ? '#e2e8f0' : '#cbd5e1')} 
+              roughness={0.15} 
+              metalness={0.05} 
+            />
+          </mesh>
+          {/* Ceramic Seat Rim */}
+          <mesh castShadow receiveShadow position={[0, 0.06, 0.1]}>
+            <boxGeometry args={[0.42, 0.04, 0.52]} />
+            <meshStandardMaterial 
+              color={isSelected ? '#3b82f6' : (hovered ? '#cbd5e1' : '#e2e8f0')} 
+              roughness={0.2} 
+            />
+          </mesh>
+          {/* Water Tank */}
+          <mesh castShadow receiveShadow position={[0, 0.1, -0.16]}>
+            <boxGeometry args={[0.46, 0.5, 0.2]} />
+            <meshStandardMaterial 
+              color={isSelected ? '#3b82f6' : (hovered ? '#f1f5f9' : '#f8fafc')} 
+              roughness={0.1} 
+              metalness={0.05} 
+            />
+          </mesh>
+          {/* Flush Buttons */}
+          <mesh position={[0.1, 0.36, -0.16]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.035, 0.035, 0.02, 8]} />
+            <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
           </mesh>
         </group>
       );
@@ -431,8 +477,8 @@ function Rack({
 
         {/* Render Inventory items visually as boxes with in-scene popups */}
         {shelves.map((y, levelIndex) => {
-          const levelItems = inventory.filter(item => Number(item.rackLevel) === levelIndex);
-          const levelRes = reservations.filter(r => Number(r.rackLevel) === levelIndex);
+          const levelItems = inventory.filter(item => item.rackId === rack.id && Number(item.rackLevel) === levelIndex);
+          const levelRes = reservations.filter(r => r.rackId === rack.id && Number(r.rackLevel) === levelIndex);
           const totalBoxCount = levelItems.length + levelRes.length;
           if (totalBoxCount === 0) return null;
 
@@ -1176,6 +1222,9 @@ export default function Locations() {
   };
 
   const handleUndo = async () => {
+    if (checkViewerAndAlert('Undo Structural Modification')) {
+      return;
+    }
     if (!undoAction) return;
     const { type, data } = undoAction;
     try {
@@ -1245,6 +1294,9 @@ export default function Locations() {
 
   // Allocation confirmation with quantity prompt custom UI step
   const handleConfirmAllocationQty = async () => {
+    if (checkViewerAndAlert('Allocate Stock to Rack Level')) {
+      return;
+    }
     if (!levelPopout.rack || levelPopout.levelIndex === null || !selectedItemToAlloc) return;
     const qtyNum = parseInt(allocQtyInput) || 0;
     
@@ -1549,6 +1601,9 @@ export default function Locations() {
   };
 
   const addRack = async () => {
+    if (checkViewerAndAlert('Create Physical Rack Structure')) {
+      return;
+    }
     const randomZ = Math.random() * 16 - 8; // fits inside active bounds
     const computedZone = getZoneByZ(randomZ).name;
     const newRack = {
@@ -1568,7 +1623,10 @@ export default function Locations() {
     }
   };
 
-  const addSketchItem = async (type: 'wall' | 'window' | 'door') => {
+  const addSketchItem = async (type: 'wall' | 'window' | 'door' | 'toilet_bowl') => {
+    if (checkViewerAndAlert('Create Warehouse Fixture Element')) {
+      return;
+    }
     if (!user) return;
     let baseSize: [number, number, number] = [3.5, 2.5, 0.25]; 
     let baseColor = '#94a3b8';
@@ -1582,6 +1640,10 @@ export default function Locations() {
       baseSize = [1.1, 2.15, 0.2];
       baseColor = '#b45309';
       label = 'Door';
+    } else if (type === 'toilet_bowl') {
+      baseSize = [0.65, 0.8, 0.65];
+      baseColor = '#f8fafc';
+      label = 'Toilet Bowl';
     }
 
     const newItem = {
@@ -1601,6 +1663,9 @@ export default function Locations() {
   };
 
   const updateSketchItemProperty = async (id: string, fields: Partial<SketchItem>) => {
+    if (checkViewerAndAlert('Update Fixture Properties')) {
+      return;
+    }
     setSketchItems(prev => prev.map(item => item.id === id ? { ...item, ...fields } : item));
     if (selectedSketchItem && selectedSketchItem.id === id) {
       setSelectedSketchItem(prev => prev ? { ...prev, ...fields } : null);
@@ -1616,6 +1681,9 @@ export default function Locations() {
   };
 
   const deleteSketchItem = async (id: string) => {
+    if (checkViewerAndAlert('Delete Warehouse Fixture')) {
+      return;
+    }
     if (selectedSketchItem?.id === id) {
       setSelectedSketchItem(null);
     }
@@ -1628,6 +1696,9 @@ export default function Locations() {
   };
 
   const deleteRack = async (id: string) => {
+    if (checkViewerAndAlert('Decommission Rack Structure')) {
+      return;
+    }
     if (!selectedRack) return;
     try {
       const placedItems = inventory.filter(item => item.rackId === id);
@@ -1672,6 +1743,9 @@ export default function Locations() {
   };
 
   const updateRackProperty = async (fields: Partial<RackData>) => {
+    if (checkViewerAndAlert('Update Rack Settings')) {
+      return;
+    }
     if (!selectedRack) return;
     try {
       await updateDoc(doc(db, 'racks', selectedRack.id), fields);
@@ -1685,6 +1759,9 @@ export default function Locations() {
   const timeoutRef = useRef<any>(null);
 
   const debouncedUpdateRackProperty = useCallback((fields: Partial<RackData>) => {
+    if (checkViewerAndAlert('Adjust Rack Placement')) {
+      return;
+    }
     if (!selectedRack) return;
     
     // Snappy, immediate local UI updates for responsiveness
@@ -1710,6 +1787,9 @@ export default function Locations() {
   }, [selectedRack?.id]);
 
   const updateRackPosition = (axis: 'x' | 'y' | 'z', delta: number) => {
+    if (checkViewerAndAlert('Shift Rack Coordinates')) {
+      return;
+    }
     if (!selectedRack) return;
     const currentPos = [...selectedRack.position] as [number, number, number];
     if (axis === 'x') currentPos[0] = Number((currentPos[0] + delta).toFixed(2));
@@ -1775,6 +1855,9 @@ export default function Locations() {
   }, [selectedRack]);
 
   const handleAssignItem = async (itemId: string, levelIdx: number) => {
+    if (checkViewerAndAlert('Rack Stock Assignment')) {
+      return;
+    }
     if (!selectedRack || !itemId) return;
     try {
       await updateDoc(doc(db, 'inventory', itemId), {
@@ -1787,6 +1870,9 @@ export default function Locations() {
   };
 
   const handleUnassignItem = async (itemId: string) => {
+    if (checkViewerAndAlert('Unassign Shelf Stock')) {
+      return;
+    }
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
     const originalRackId = item.rackId;
@@ -1807,6 +1893,9 @@ export default function Locations() {
   };
 
   const handleUnassignReservation = async (reservationId: string) => {
+    if (checkViewerAndAlert('Unassign Hold Reservation from Shelf')) {
+      return;
+    }
     const res = reservations.find(r => r.id === reservationId);
     if (!res) return;
     const originalRackId = res.rackId;
@@ -1833,6 +1922,9 @@ export default function Locations() {
   };
 
   const handleAssignReservationToLevel = async (resId: string, levelIndex: number) => {
+    if (checkViewerAndAlert('Shelf Reservation Assignment')) {
+      return;
+    }
     if (!selectedRack) return;
     try {
       await updateDoc(doc(db, 'reservations', resId), {
@@ -2687,7 +2779,7 @@ export default function Locations() {
               </h3>
 
               {/* Creator Button Grid */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => addSketchItem('wall')}
@@ -2711,6 +2803,14 @@ export default function Locations() {
                 >
                   <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">🚪</div>
                   <span className="text-[9.5px] font-bold">Add Door</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSketchItem('toilet_bowl')}
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95Group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
+                  <span className="text-[9.5px] font-bold">Add Toilet</span>
                 </button>
               </div>
 
@@ -2874,7 +2974,7 @@ export default function Locations() {
               </h3>
 
               {/* Creator Button Grid */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => addSketchItem('wall')}
@@ -2898,6 +2998,14 @@ export default function Locations() {
                 >
                   <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">🚪</div>
                   <span className="text-[9.5px] font-bold">Add Door</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addSketchItem('toilet_bowl')}
+                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
+                  <span className="text-[9.5px] font-bold">Add Toilet</span>
                 </button>
               </div>
 
@@ -3061,7 +3169,7 @@ export default function Locations() {
                 </h3>
 
                 {/* Creator Button Grid */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => addSketchItem('wall')}
@@ -3085,6 +3193,14 @@ export default function Locations() {
                   >
                     <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">🚪</div>
                     <span className="text-[9.5px] font-bold">Add Door</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addSketchItem('toilet_bowl')}
+                    className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
+                    <span className="text-[9.5px] font-bold">Add Toilet</span>
                   </button>
                 </div>
 

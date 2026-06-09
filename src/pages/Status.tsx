@@ -4,6 +4,7 @@ import {
   MapPin, Clipboard, Check, HelpCircle, FileText, Package 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { checkViewerAndAlert } from '@/src/lib/auth-alert';
 import { 
   db, collection, onSnapshot, query, orderBy, updateDoc, doc, addDoc, setDoc,
   serverTimestamp, deleteDoc, handleFirestoreError, OperationType, auth, 
@@ -309,6 +310,9 @@ export default function Status() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkViewerAndAlert('Save Status Record')) {
+      return;
+    }
     const orderStr = order.trim();
     const itemStr = item.trim();
     const qtyNum = parseInt(qty, 10);
@@ -318,7 +322,7 @@ export default function Status() {
       return;
     }
 
-    const actor = user?.email || 'Unknown';
+    const actor = localStorage.getItem('epedu_username') || user?.email || 'Unknown';
     const fieldMap: any = { 
       'Old warehouse': 'qtyOld', 
       'New warehouse': 'qtyNew', 
@@ -590,6 +594,9 @@ export default function Status() {
   };
 
   const handleDelete = async (id: string) => {
+    if (checkViewerAndAlert('Delete Status Record')) {
+      return;
+    }
     // Revert inventory stock if this were a reserve/loan/rent record
     const record = statuses.find(s => s.id === id);
     if (record && ['Reserve', 'Loan', 'Rent'].includes(record.status)) {
@@ -646,6 +653,9 @@ export default function Status() {
   };
 
   const handleConfirmReservation = async (record: StatusRecord) => {
+    if (checkViewerAndAlert('Confirm Reservation')) {
+      return;
+    }
     try {
       // 1. Subtract from physical location stock and overall total in Firestore & RTDB
       const matchingProduct = products.find(p => p.name.toLowerCase() === record.item.toLowerCase());

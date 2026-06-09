@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Package, MapPin, Settings, BarChart3, LogOut, Menu, History, ClipboardList, Bookmark } from 'lucide-react';
+import { LayoutDashboard, Package, MapPin, Settings, BarChart3, LogOut, Menu, History, ClipboardList, Bookmark, Users } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { motion } from 'motion/react';
 
@@ -12,7 +12,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, onLogout }: SidebarProps) {
-  const menuItems = [
+  const username = localStorage.getItem('epedu_username') || '';
+  const role = localStorage.getItem('epedu_role') || '';
+  const isSuperAdmin = username.toLowerCase() === 'admin' || username.toLowerCase() === 'epadmin' || role === 'super_admin';
+
+  let menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'inventory', icon: Package, label: 'Inventory' },
     { id: 'locations', icon: MapPin, label: 'Location' },
@@ -20,6 +24,14 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
     { id: 'history', icon: History, label: 'History' },
     { id: 'settings', icon: Settings, label: 'Settings' },
   ];
+
+  if (isSuperAdmin) {
+    menuItems.push({ id: 'accounts', icon: Users, label: 'Account' });
+  }
+
+  if (role === 'viewer') {
+    menuItems = menuItems.filter(item => ['inventory', 'locations', 'status'].includes(item.id));
+  }
 
   return (
     <>
@@ -49,7 +61,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                 animate={{ opacity: 1 }}
                 className="ml-3 font-bold text-slate-800 text-lg tracking-tight whitespace-nowrap"
               >
-                STRATOS<span className="font-normal text-slate-500">CORE</span>
+                EP <span className="font-normal text-slate-500">INVENTORY</span>
               </motion.span>
             )}
           </div>
@@ -95,7 +107,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
 
           {/* Bottom Branding Info */}
           <div className="p-4 border-t border-slate-100 text-center select-none">
-            <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] block leading-none">StratosCore v1.0.4</span>
+            <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] block leading-none">EP Inventory v1.0.4</span>
           </div>
         </div>
       </aside>

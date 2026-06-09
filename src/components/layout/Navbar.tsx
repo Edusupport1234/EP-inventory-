@@ -54,7 +54,7 @@ export default function Navbar({ toggleSidebar, onLogout }: NavbarProps) {
           <button 
             onClick={onLogout}
             className="flex items-center gap-1.5 p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 border border-rose-100 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Sign Out of StratosCore"
+            title="Sign Out of EP Inventory"
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span className="text-[10px] font-black uppercase tracking-wider hidden md:inline pr-1">Logout</span>

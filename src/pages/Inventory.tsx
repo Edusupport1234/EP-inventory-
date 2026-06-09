@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { checkViewerAndAlert } from '@/src/lib/auth-alert';
 import { db, collection, onSnapshot, query, orderBy, updateDoc, doc, addDoc, setDoc, serverTimestamp, deleteDoc, handleFirestoreError, OperationType, auth, rtdb, ref, onValue, set, update, remove } from '@/src/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -320,6 +321,9 @@ export default function Inventory() {
   );
 
   const handleAdjust = async () => {
+    if (checkViewerAndAlert('Adjust Inventory Stock')) {
+      return;
+    }
     const { item, mode } = adjustModal;
     if (!item || !adjAmount) return;
 
@@ -356,7 +360,7 @@ export default function Inventory() {
         itemId: item.id,
         location: adjLocation,
         delta: finalDelta,
-        actor: user?.email || 'Unknown',
+        actor: localStorage.getItem('epedu_username') || user?.email || 'Unknown',
         purpose: adjPurpose,
         takenBy: adjTakenBy
       });
@@ -371,6 +375,9 @@ export default function Inventory() {
   };
 
   const handleRename = async () => {
+    if (checkViewerAndAlert('Rename Inventory Item')) {
+      return;
+    }
     if (!renameModal.item || !newName) return;
     try {
       await updateDoc(doc(db, 'inventory', renameModal.item.id), { name: newName });
@@ -385,6 +392,9 @@ export default function Inventory() {
   };
 
   const handleDelete = async () => {
+    if (checkViewerAndAlert('Delete Stock Item')) {
+      return;
+    }
     if (!deleteModal.item) return;
     try {
       await deleteDoc(doc(db, 'inventory', deleteModal.item.id));
@@ -398,6 +408,9 @@ export default function Inventory() {
   };
 
   const handleUpdateImageLink = async () => {
+    if (checkViewerAndAlert('Update Item Image Link')) {
+      return;
+    }
     if (!editingImageItem) return;
     try {
       const updatedImg = newImageLink.trim();
@@ -431,6 +444,9 @@ export default function Inventory() {
   };
 
   const handleCreateHold = async () => {
+    if (checkViewerAndAlert('Reserve Stock Hold')) {
+      return;
+    }
     if (!holdModal.item || !holdClientName || !holdQty || !holdOrderId) {
       showToast("Please fill in Order ID, Client Name and Quantity", "warn");
       return;
@@ -548,6 +564,9 @@ export default function Inventory() {
 
   const handleCreateNewItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkViewerAndAlert('Create New Stock Item')) {
+      return;
+    }
     if (!newItemDetails.name.trim()) {
       showToast("Item name is required!", "warn");
       return;
@@ -947,8 +966,16 @@ export default function Inventory() {
         {renameModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setRenameModal({ ...renameModal, open: false })} className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-[#EEE6D8]">
-              <div className="p-4 border-b border-[#F2EDE2] font-bold text-slate-850 text-[10px] uppercase tracking-widest bg-[#FAF8F5]">Rename Item Designation</div>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-[#EEE6D8] overflow-hidden">
+              <div className="p-4 border-b border-[#F2EDE2] font-bold text-slate-850 text-[10px] uppercase tracking-widest bg-[#FAF8F5] flex items-center justify-between">
+                <span>Rename Item Designation</span>
+                <button 
+                  onClick={() => setRenameModal({ ...renameModal, open: false })} 
+                  className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-[#F2EDE2]/50 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <div className="p-6 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-semibold">New Designation</label>
@@ -964,7 +991,13 @@ export default function Inventory() {
         {deleteModal.open && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteModal({ ...deleteModal, open: false })} className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-rose-100">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-rose-100 overflow-hidden">
+              <button 
+                onClick={() => setDeleteModal({ ...deleteModal, open: false })} 
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-50 transition-colors cursor-pointer outline-none"
+              >
+                <X className="w-4 h-4" />
+              </button>
               <div className="p-8 text-center space-y-5">
                 <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto border border-rose-100">
                    <AlertTriangle className="w-7 h-7" />

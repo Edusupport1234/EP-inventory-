@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { User, Lock, AlertCircle, ShieldCheck } from 'lucide-react';
+import { db } from '@/src/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface LoginGateProps {
   onLoginSuccess: () => void;
@@ -12,26 +14,54 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    // Simulate a brief, satisfying, high-end system authorization check delay
-    setTimeout(() => {
-      const trimmedUser = username.trim();
-      const trimmedPass = password.trim();
-      const upperUser = trimmedUser.toUpperCase();
+    const trimmedUser = username.trim().toLowerCase();
+    const trimmedPass = password.trim();
 
-      if (trimmedUser !== "" && trimmedPass === "123456") {
+    if (!trimmedUser || !trimmedPass) {
+      setIsLoading(false);
+      setError('Please provide both username and password.');
+      return;
+    }
+
+    try {
+      // 1. Check root credential fallback bootstrap
+      if ((trimmedUser === 'epadmin' || trimmedUser === 'admin') && trimmedPass === '123456') {
         localStorage.setItem('epedu_auth', 'true');
-        localStorage.setItem('epedu_username', trimmedUser);
+        localStorage.setItem('epedu_username', 'EPADMIN');
+        localStorage.setItem('epedu_role', 'super_admin');
         onLoginSuccess();
+        return;
+      }
+
+      // 2. Query Firestore user accounts
+      const userRef = doc(db, 'userAccounts', trimmedUser);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (userData.password === trimmedPass) {
+          localStorage.setItem('epedu_auth', 'true');
+          localStorage.setItem('epedu_username', userData.username || trimmedUser);
+          localStorage.setItem('epedu_role', userData.role || 'user');
+          onLoginSuccess();
+        } else {
+          setIsLoading(false);
+          setError('Invalid username or password. Please verify credentials.');
+        }
       } else {
         setIsLoading(false);
-        setError('Invalid username or password. Please verify credentials and try again.');
+        setError('User account not found. Please verify username or contact Super Admin.');
       }
-    }, 750);
+    } catch (err: any) {
+      console.error("Database authentication query failed:", err);
+      setIsLoading(false);
+      setError('System authentication error. Unable to connect to authorization database.');
+    }
   };
 
   return (
@@ -53,7 +83,7 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
             <div className="w-5 h-5 border-[3px] border-white rotate-45" />
           </div>
           <h2 className="text-xl font-bold font-sans tracking-tight text-slate-800">
-            STRATOS<span className="text-blue-600">CORE</span>
+            EP <span className="text-blue-600">INVENTORY</span>
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest">
             Cloud Warehouse Terminal

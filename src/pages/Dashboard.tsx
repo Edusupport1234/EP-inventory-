@@ -380,7 +380,7 @@ export default function Dashboard() {
         itemId: item.id,
         location: adjLocation,
         delta: finalDelta,
-        actor: user?.email || 'Unknown',
+        actor: localStorage.getItem('epedu_username') || user?.email || 'Unknown',
         purpose: adjPurpose,
         takenBy: adjTakenBy
       });
@@ -768,7 +768,7 @@ export default function Dashboard() {
       <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-800 tracking-tight">System Perspective</h1>
-          <p className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">StratosCore Integration Hub</p>
+          <p className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">EP Inventory Integration Hub</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <a
@@ -1332,7 +1332,7 @@ export default function Dashboard() {
               className="relative w-full max-w-md bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden"
             >
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="font-bold text-slate-800 tracking-tight text-sm uppercase tracking-widest">Stratos Scan</h2>
+                <h2 className="font-bold text-slate-800 tracking-tight text-sm uppercase tracking-widest">EP Scan</h2>
                 <button onClick={() => setIsScannerOpen(false)} className="p-1 hover:bg-slate-50 rounded-full transition-colors">
                   <X className="w-5 h-5 text-slate-400" />
                 </button>
