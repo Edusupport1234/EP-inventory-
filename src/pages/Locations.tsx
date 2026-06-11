@@ -31,6 +31,7 @@ export interface InventoryItem {
   qty: number;
   rackId?: string;
   rackLevel?: number;
+  shelfOffset?: number;
 }
 
 export interface Reservation {
@@ -41,6 +42,7 @@ export interface Reservation {
   qty: number;
   rackId?: string;
   rackLevel?: number;
+  shelfOffset?: number;
 }
 
 export interface LevelPopoutState {
@@ -50,6 +52,7 @@ export interface LevelPopoutState {
 }
 
 export interface ZoneInfo {
+  id?: string;
   name: string;
   color: string;
   label: string;
@@ -65,17 +68,18 @@ export const PHYSICAL_ZONES: ZoneInfo[] = [
   { name: 'Zone 5', color: '#8b5cf6', label: 'LANE 1 • PURPLE ZONE • SOUTH END', zCenter: 8, lane: 'LANE 1' },
 ];
 
-export function getZoneByZ(z: number): ZoneInfo {
+export function getZoneByZ(z: number, zones: ZoneInfo[] = PHYSICAL_ZONES): ZoneInfo {
+  const list = zones.length === 5 ? zones : PHYSICAL_ZONES;
   if (z < -6) {
-    return PHYSICAL_ZONES[0];
+    return list[0];
   } else if (z < -2) {
-    return PHYSICAL_ZONES[1];
+    return list[1];
   } else if (z < 2) {
-    return PHYSICAL_ZONES[2];
+    return list[2];
   } else if (z < 6) {
-    return PHYSICAL_ZONES[3];
+    return list[3];
   } else {
-    return PHYSICAL_ZONES[4];
+    return list[4];
   }
 }
 
@@ -390,7 +394,8 @@ function Rack({
   activeBoxPopup,
   onSetBoxPopup,
   isOverlapping = false,
-  onDoubleClickRack
+  onDoubleClickRack,
+  visualZones
 }: { 
   rack: RackData, 
   inventory: InventoryItem[],
@@ -404,7 +409,8 @@ function Rack({
   activeBoxPopup: any | null,
   onSetBoxPopup: (info: any | null) => void,
   isOverlapping?: boolean,
-  onDoubleClickRack?: (rack: RackData) => void
+  onDoubleClickRack?: (rack: RackData) => void,
+  visualZones: ZoneInfo[]
 }) {
   const [hovered, setHover] = useState(false);
 
@@ -417,7 +423,7 @@ function Rack({
   const shelves = Array.from({ length: N }).map((_, i) => i * 1.0 + 0.45);
   
   // Calculate dynamic active zone and corresponding indication colour
-  const activeZone = getZoneByZ(rack.position[2]);
+  const activeZone = getZoneByZ(rack.position[2], visualZones);
 
   const renderRackContent = () => {
     return (
@@ -488,7 +494,8 @@ function Rack({
 
           const standardBoxes = levelItems.map((item, boxIdx) => {
             const ratio = totalBoxCount > 1 ? (boxIdx / (totalBoxCount - 1)) - 0.5 : 0;
-            const xPos = ratio * (W - 0.8);
+            const shelfOffset = item.shelfOffset !== undefined ? item.shelfOffset : ratio;
+            const xPos = shelfOffset * (W - 0.8);
 
             const hash = item.name.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
             const colors = ["#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#8b5cf6", "#ec4899"];
@@ -535,38 +542,6 @@ function Rack({
                     />
                   )}
                 </mesh>
-
-                {isPopupActive && (
-                  <Html distanceFactor={8} position={[0, boxHeight / 2, 0]} center zIndexRange={[100, 200]}>
-                    <div className="relative bg-slate-900/95 text-white p-3 rounded-xl shadow-2xl border border-slate-700 min-w-[200px] pointer-events-auto backdrop-blur-md animate-in zoom-in-95 duration-150 select-none transform -translate-y-[calc(50%+14px)]">
-                      <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-800">
-                        <span className="text-[7.5px] font-black tracking-widest text-[#10b981] bg-emerald-950/65 px-1.5 py-0.5 rounded uppercase leading-none font-sans">Standard Item</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSetBoxPopup(null);
-                          }}
-                          className="text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-800 transition-all cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <p className="text-[10px] font-black tracking-wide text-slate-100 uppercase mb-1 leading-snug">{item.name}</p>
-                      <div className="space-y-0.5 text-[8.5px] text-slate-350 font-semibold">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Rack location:</span>
-                          <span>{rack.name} (Tier {levelIndex + 1})</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] font-black text-white pt-1">
-                          <span>Available stock:</span>
-                          <span className="text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-bold">{item.qty || 0} units</span>
-                        </div>
-                      </div>
-                      {/* Speech bubble pointer */}
-                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-r border-b border-slate-700 rotate-45" />
-                    </div>
-                  </Html>
-                )}
               </group>
             );
           });
@@ -574,7 +549,8 @@ function Rack({
           const reservationBoxes = levelRes.map((res, resIdx) => {
             const boxIdx = levelItems.length + resIdx;
             const ratio = totalBoxCount > 1 ? (boxIdx / (totalBoxCount - 1)) - 0.5 : 0;
-            const xPos = ratio * (W - 0.8);
+            const shelfOffset = res.shelfOffset !== undefined ? res.shelfOffset : ratio;
+            const xPos = shelfOffset * (W - 0.8);
 
             const isPopupActive = activeBoxPopup?.id === res.id && activeBoxPopup?.type === 'reservation';
 
@@ -619,43 +595,6 @@ function Rack({
                     />
                   )}
                 </mesh>
-
-                {isPopupActive && (
-                  <Html distanceFactor={8} position={[0, boxHeight / 2, 0]} center zIndexRange={[100, 200]}>
-                    <div className="relative bg-slate-900/95 text-white p-3 rounded-xl shadow-2xl border border-slate-700 min-w-[200px] pointer-events-auto backdrop-blur-md animate-in zoom-in-95 duration-150 select-none transform -translate-y-[calc(50%+14px)]">
-                      <div className="flex items-center justify-between gap-2 mb-1.5 pb-1 border-b border-slate-800">
-                        <span className="text-[7.5px] font-black tracking-widest text-[#f59e0b] bg-amber-950/65 px-1.5 py-0.5 rounded uppercase leading-none font-sans font-bold">Reserved Hold</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSetBoxPopup(null);
-                          }}
-                          className="text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-800 transition-all cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                      <p className="text-[10px] font-black tracking-wide text-slate-100 uppercase mb-0.5 leading-snug">{res.itemName}</p>
-                      <p className="text-[8px] font-bold text-amber-400/90 tracking-wider uppercase mb-1 leading-none font-sans font-directed">To: {res.clientName}</p>
-                      <div className="space-y-0.5 text-[8.5px] text-slate-350 font-semibold">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Order Ref:</span>
-                          <span className="font-mono text-[7px] tracking-tight">{res.orderId}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-500">Rack location:</span>
-                          <span>{rack.name} (Tier {levelIndex + 1})</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[10px] font-black text-white pt-1">
-                          <span>Reserved hold:</span>
-                          <span className="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded font-bold">{res.qty || 0} units</span>
-                        </div>
-                      </div>
-                      {/* Speech bubble pointer */}
-                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-r border-b border-slate-700 rotate-45" />
-                    </div>
-                  </Html>
-                )}
               </group>
             );
           });
@@ -729,7 +668,8 @@ const WarehouseScene = ({
   onUpdateSketchItem,
   freeMoveActive,
   onDoubleClickRack,
-  onDoubleClickSketchItem
+  onDoubleClickSketchItem,
+  visualZones
 }: { 
   racks: RackData[], 
   inventory: InventoryItem[],
@@ -750,7 +690,8 @@ const WarehouseScene = ({
   onUpdateSketchItem: (id: string, fields: Partial<SketchItem>) => void,
   freeMoveActive: boolean,
   onDoubleClickRack?: (rack: RackData) => void,
-  onDoubleClickSketchItem?: (item: SketchItem) => void
+  onDoubleClickSketchItem?: (item: SketchItem) => void,
+  visualZones: ZoneInfo[]
 }) => {
   const rackInventories = useMemo(() => {
     const map: { [rackId: string]: InventoryItem[] } = {};
@@ -889,7 +830,7 @@ const WarehouseScene = ({
       </mesh>
 
       {/* Visual representation of 5 vertical zones of the spatial layout */}
-      {PHYSICAL_ZONES.map((zone) => {
+      {visualZones.map((zone) => {
         return (
           <group key={zone.name}>
             <mesh 
@@ -970,6 +911,7 @@ const WarehouseScene = ({
           onSetBoxPopup={onSetBoxPopup}
           isOverlapping={isRackOverlapping(rack)}
           onDoubleClickRack={onDoubleClickRack}
+          visualZones={visualZones}
         />
       ))}
 
@@ -1069,6 +1011,8 @@ const WarehouseScene = ({
 };
 
 export default function Locations() {
+  const [activeTab, setActiveTab] = useState<'3d' | 'labels'>('3d');
+  const [visualZones, setVisualZones] = useState<ZoneInfo[]>(PHYSICAL_ZONES);
   const [selectedRack, setSelectedRack] = useState<RackData | null>(null);
   const [selectedLevelIndex, setSelectedLevelIndex] = useState<number | null>(null);
   const [racks, setRacks] = useState<RackData[]>([]);
@@ -1113,6 +1057,7 @@ export default function Locations() {
   // Prompting state inside level add popup for item quantity allocation
   const [selectedItemToAlloc, setSelectedItemToAlloc] = useState<any | null>(null);
   const [allocQtyInput, setAllocQtyInput] = useState('1');
+  const [allocShelfOffset, setAllocShelfOffset] = useState<number>(0);
 
   // Overall Global locator search variables
   const [overallSearchVal, setOverallSearchVal] = useState('');
@@ -1138,6 +1083,20 @@ export default function Locations() {
     clientName?: string;
     orderId?: string;
   } | null>(null);
+
+  const [activeBoxOffset, setActiveBoxOffset] = useState<number>(0);
+
+  useEffect(() => {
+    if (activeBoxPopup) {
+      if (activeBoxPopup.type === 'standard') {
+        const item = inventory.find(i => i.id === activeBoxPopup.id);
+        setActiveBoxOffset(item?.shelfOffset !== undefined ? item.shelfOffset : 0);
+      } else {
+        const r = reservations.find(res => res.id === activeBoxPopup.id);
+        setActiveBoxOffset(r?.shelfOffset !== undefined ? r.shelfOffset : 0);
+      }
+    }
+  }, [activeBoxPopup?.id, activeBoxPopup?.type, inventory, reservations]);
 
   // Undo Toast state
   const [undoAction, setUndoAction] = useState<{
@@ -1306,7 +1265,8 @@ export default function Locations() {
         await updateDoc(doc(db, 'inventory', selectedItemToAlloc.id), {
           rackId: levelPopout.rack.id,
           rackLevel: levelPopout.levelIndex,
-          qty: qtyNum
+          qty: qtyNum,
+          shelfOffset: allocShelfOffset
         });
 
         // 2. Update RTDB for synchronization
@@ -1314,7 +1274,8 @@ export default function Locations() {
           await update(ref(rtdb, `inventory/${selectedItemToAlloc.id}`), {
             rackId: levelPopout.rack.id,
             rackLevel: levelPopout.levelIndex,
-            qty: qtyNum
+            qty: qtyNum,
+            shelfOffset: allocShelfOffset
           });
         } catch (err_rtdb) {
           console.warn("RTDB sync skipped: ", err_rtdb);
@@ -1324,13 +1285,15 @@ export default function Locations() {
         await updateDoc(doc(db, 'reservations', selectedItemToAlloc.id), {
           rackId: levelPopout.rack.id,
           rackLevel: levelPopout.levelIndex,
-          qty: qtyNum
+          qty: qtyNum,
+          shelfOffset: allocShelfOffset
         });
         try {
           await update(ref(rtdb, `reservations/${selectedItemToAlloc.id}`), {
             rackId: levelPopout.rack.id,
             rackLevel: levelPopout.levelIndex,
-            qty: qtyNum
+            qty: qtyNum,
+            shelfOffset: allocShelfOffset
           });
         } catch (err_rtdb) {}
       }
@@ -1338,6 +1301,7 @@ export default function Locations() {
       // Reset nested statuses
       setSelectedItemToAlloc(null);
       setAllocQtyInput('1');
+      setAllocShelfOffset(0);
       setIsAddingToLevel(false);
 
       // Refresh popout info
@@ -1449,6 +1413,37 @@ export default function Locations() {
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => setUser(u));
   }, []);
+
+  // Sync Dynamic Lane / Zone Configurations on fresh Firestore snapshots
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(collection(db, 'zones'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const dbZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      if (dbZones.length === 0) {
+        // Seeding default zones to Firestore
+        PHYSICAL_ZONES.forEach(async (z) => {
+          try {
+            await addDoc(collection(db, 'zones'), z);
+          } catch (error) {
+            console.error("Error seeding default zone physical layout:", error);
+          }
+        });
+      } else {
+        // Sort them by name or label to lock the visual sequencing (1 to 5)
+        const sorted = dbZones.sort((a, b) => {
+          const nameA = a.name || '';
+          const nameB = b.name || '';
+          return nameA.localeCompare(nameB);
+        });
+        setVisualZones(sorted);
+      }
+    }, (error) => {
+      console.error("Error reading live zone lists:", error);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   // Sync Rack Selection on fresh Firestore snapshots
   useEffect(() => {
@@ -1755,6 +1750,18 @@ export default function Locations() {
     }
   };
 
+  const updateZoneField = async (id: string, fields: Partial<ZoneInfo>) => {
+    if (checkViewerAndAlert('Update Zone Configuration')) {
+      return;
+    }
+    setVisualZones(prev => prev.map(z => z.id === id ? { ...z, ...fields } : z));
+    try {
+      await updateDoc(doc(db, 'zones', id), fields);
+    } catch (error) {
+      console.error("Error updating zone details in Firestore:", error);
+    }
+  };
+
   const pendingUpdatesRef = useRef<{ [key: string]: any }>({});
   const timeoutRef = useRef<any>(null);
 
@@ -1963,9 +1970,36 @@ export default function Locations() {
             <p className={cn("text-[11px] uppercase tracking-wider font-semibold", isFullscreen ? "text-slate-400" : "text-slate-500")}>Warehouse Floor Map & Configuration</p>
           </div>
           <div className="flex gap-2">
+            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shadow-3xs">
+              <button
+                type="button"
+                onClick={() => setActiveTab('3d')}
+                className={cn(
+                  "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all cursor-pointer",
+                  activeTab === '3d' 
+                    ? "bg-white text-slate-850 shadow-3xs" 
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                3D Layout
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('labels')}
+                className={cn(
+                  "px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-md transition-all cursor-pointer",
+                  activeTab === 'labels' 
+                    ? "bg-white text-slate-850 shadow-3xs" 
+                    : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Lane Labels
+              </button>
+            </div>
+
             <button 
               onClick={addRack}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-3 py-2 rounded-lg active:scale-95 transition-all shadow-md shrink-0 uppercase tracking-widest"
+              className="bg-[#f05a3e] hover:bg-[#d44327] text-white text-[11px] font-bold px-3 py-2 rounded-lg active:scale-95 transition-all shadow-md shrink-0 uppercase tracking-widest"
             >
               + ADD NEW RACK
             </button>
@@ -1996,13 +2030,13 @@ export default function Locations() {
                 setShowSearchDropdown(true);
               }}
               className={cn(
-                "w-full border rounded-lg py-2 pl-3 pr-10 text-xs font-semibold outline-none focus:border-blue-500 shadow-sm",
+                "w-full border rounded-lg py-2 pl-3 pr-10 text-xs font-semibold outline-none focus:border-[#f05a3e] shadow-sm",
                 isFullscreen ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-[#E2D8C9] text-slate-800"
               )}
             />
             <button 
               onClick={executeSearchLocator}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-all active:scale-95 shadow-xs"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-md transition-all active:scale-95 shadow-xs"
               title="Locate Item"
             >
               <Search className="w-3.5 h-3.5" />
@@ -2086,14 +2120,15 @@ export default function Locations() {
           </div>
         )}
 
-        {/* 3D Visualizer Render Port */}
-        <div 
-          ref={containerRef} 
-          className={cn(
-            "bg-slate-900 overflow-hidden relative group rounded-[20px] border border-slate-805 shadow-inner flex-1",
-            isFullscreen ? "min-h-0" : "min-h-[350px]"
-          )}
-        >
+        {activeTab === '3d' ? (
+          /* 3D Visualizer Render Port */
+          <div 
+            ref={containerRef} 
+            className={cn(
+              "bg-slate-900 overflow-hidden relative group rounded-[20px] border border-slate-805 shadow-inner flex-1",
+              isFullscreen ? "min-h-0" : "min-h-[350px]"
+            )}
+          >
           {racks.length > 0 ? (
             <Canvas 
               shadows
@@ -2163,6 +2198,7 @@ export default function Locations() {
                   setSelectedRack(null);
                   setFreeMoveActive(true);
                 }}
+                visualZones={visualZones}
               />
               <CameraController 
                 selectedRack={selectedRack}
@@ -2181,7 +2217,7 @@ export default function Locations() {
               </p>
               <button 
                 onClick={addRack}
-                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 duration-150 transition-all shadow-md shadow-blue-900/50 cursor-pointer"
+                className="mt-4 px-4 py-2 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-xl text-[10px] font-black uppercase tracking-widest active:scale-95 duration-150 transition-all shadow-md shadow-orange-900/50 cursor-pointer"
               >
                 + Place First Rack
               </button>
@@ -2212,7 +2248,7 @@ export default function Locations() {
               >
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                   <div className="flex items-center gap-2">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-105 p-2 rounded-xl text-blue-600 shadow-3xs">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-105 p-2 rounded-xl text-[#f05a3e] shadow-3xs">
                       <Move className="w-4 h-4 animate-pulse shrink-0" />
                     </div>
                     <div>
@@ -2248,11 +2284,11 @@ export default function Locations() {
                   <div className="grid grid-cols-2 gap-1 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center shadow-3xs">
                     <div className="flex flex-col items-center">
                       <span className="text-[7.5px] font-black uppercase text-slate-400 tracking-wider">West ── East</span>
-                      <span className="font-mono text-[10px] font-black text-blue-600 mt-1">X: {selectedRack.position[0].toFixed(1)}m</span>
+                      <span className="font-mono text-[10px] font-black text-[#f05a3e] mt-1">X: {selectedRack.position[0].toFixed(1)}m</span>
                     </div>
                     <div className="flex flex-col items-center border-l border-slate-150">
                       <span className="text-[7.5px] font-black uppercase text-slate-400 tracking-wider">North ── South</span>
-                      <span className="font-mono text-[10px] font-black text-indigo-700 mt-1">Z: {selectedRack.position[2].toFixed(1)}m</span>
+                      <span className="font-mono text-[10px] font-black text-[#d44327] mt-1">Z: {selectedRack.position[2].toFixed(1)}m</span>
                     </div>
                   </div>
 
@@ -2261,7 +2297,7 @@ export default function Locations() {
                     <div className="space-y-1">
                       <div className="flex justify-between items-center text-[8.5px] font-extrabold text-slate-500 uppercase tracking-wide">
                         <span>← West | East →</span>
-                        <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[8px] font-bold">X-Axis</span>
+                        <span className="font-mono bg-orange-50 text-[#d44327] px-1.5 py-0.5 rounded text-[8px] font-bold">X-Axis</span>
                       </div>
                       <input 
                         type="range"
@@ -2273,14 +2309,14 @@ export default function Locations() {
                           const val = parseFloat(e.target.value);
                           onMoveRack(selectedRack.id, [val, selectedRack.position[1], selectedRack.position[2]]);
                         }}
-                        className="w-full h-1 bg-slate-200 accent-blue-600 rounded-lg cursor-pointer"
+                        className="w-full h-1 bg-slate-200 accent-[#f05a3e] rounded-lg cursor-pointer"
                       />
                     </div>
                     
                     <div className="space-y-1">
                       <div className="flex justify-between items-center text-[8.5px] font-extrabold text-slate-500 uppercase tracking-wide">
                         <span>↑ North | South ↓</span>
-                        <span className="font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[8px] font-bold">Z-Axis</span>
+                        <span className="font-mono bg-orange-50 text-[#d44327] px-1.5 py-0.5 rounded text-[8px] font-bold">Z-Axis</span>
                       </div>
                       <input 
                         type="range"
@@ -2292,7 +2328,7 @@ export default function Locations() {
                           const val = parseFloat(e.target.value);
                           onMoveRack(selectedRack.id, [selectedRack.position[0], selectedRack.position[1], val]);
                         }}
-                        className="w-full h-1 bg-slate-200 accent-indigo-600 rounded-lg cursor-pointer"
+                        className="w-full h-1 bg-slate-200 accent-[#f05a3e] rounded-lg cursor-pointer"
                       />
                     </div>
                   </div>
@@ -2306,7 +2342,7 @@ export default function Locations() {
                       <button
                         type="button"
                         onClick={() => onMoveRack(selectedRack.id, [selectedRack.position[0], selectedRack.position[1], selectedRack.position[2] - 0.5])}
-                        className="w-8 h-8 bg-white hover:bg-blue-600 border border-slate-200 hover:border-blue-550 rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
+                        className="w-8 h-8 bg-white hover:bg-[#f05a3e] border border-slate-200 hover:border-[#d44327] rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
                         title="Nudge North (W / Up)"
                       >
                         <ArrowUp className="w-3.5 h-3.5 text-slate-500 group-hover:text-white" />
@@ -2316,21 +2352,21 @@ export default function Locations() {
                       <button
                         type="button"
                         onClick={() => onMoveRack(selectedRack.id, [selectedRack.position[0] - 0.5, selectedRack.position[1], selectedRack.position[2]])}
-                        className="w-8 h-8 bg-white hover:bg-blue-600 border border-slate-200 hover:border-blue-550 rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
+                        className="w-8 h-8 bg-white hover:bg-[#f05a3e] border border-slate-200 hover:border-[#d44327] rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
                         title="Nudge West (A / Left)"
                       >
                         <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:text-white" />
                       </button>
                       
-                      <div className="w-8 h-8 bg-blue-50 border border-blue-100 rounded-lg flex flex-col items-center justify-center select-none text-[6px] font-bold text-blue-600 leading-none">
+                      <div className="w-8 h-8 bg-orange-50 border border-orange-100 rounded-lg flex flex-col items-center justify-center select-none text-[6px] font-bold text-[#f05a3e] leading-none">
                         <span>STEP</span>
-                        <span className="text-[7.5px] text-blue-700 font-mono mt-0.5 font-black">0.5m</span>
+                        <span className="text-[7.5px] text-[#d44327] font-mono mt-0.5 font-black">0.5m</span>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => onMoveRack(selectedRack.id, [selectedRack.position[0] + 0.5, selectedRack.position[1], selectedRack.position[2]])}
-                        className="w-8 h-8 bg-white hover:bg-blue-600 border border-slate-200 hover:border-blue-550 rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
+                        className="w-8 h-8 bg-white hover:bg-[#f05a3e] border border-slate-200 hover:border-[#d44327] rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
                         title="Nudge East (D / Right)"
                       >
                         <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-white" />
@@ -2340,7 +2376,7 @@ export default function Locations() {
                       <button
                         type="button"
                         onClick={() => onMoveRack(selectedRack.id, [selectedRack.position[0], selectedRack.position[1], selectedRack.position[2] + 0.5])}
-                        className="w-8 h-8 bg-white hover:bg-blue-600 border border-slate-200 hover:border-blue-550 rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
+                        className="w-8 h-8 bg-white hover:bg-[#f05a3e] border border-slate-200 hover:border-[#d44327] rounded-lg flex items-center justify-center transition-all hover:text-white cursor-pointer shadow-2xs group active:scale-90"
                         title="Nudge South (S / Down)"
                       >
                         <ArrowDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-white" />
@@ -2371,10 +2407,10 @@ export default function Locations() {
                 className="absolute left-4 top-4 bottom-4 w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl z-20 overflow-hidden flex flex-col border border-slate-200"
               >
                 {/* Header */}
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-blue-50/50 shrink-0">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-orange-50/50 shrink-0">
                   <div>
                     <h3 className="font-extrabold text-slate-800 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                      <Layers className="w-3.5 h-3.5 text-[#f05a3e] animate-pulse" />
                       <span>Level {levelPopout.levelIndex + 1} Deck Details</span>
                     </h3>
                     <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
@@ -2468,7 +2504,7 @@ export default function Locations() {
                           setIsAddingToLevel(true);
                           setAddingLevelSearch('');
                         }}
-                        className="w-full py-2.5 mt-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all shadow shadow-blue-200/50 flex items-center justify-center gap-1 cursor-pointer"
+                        className="w-full py-2.5 mt-2 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-xl text-[10px] font-extrabold uppercase tracking-widest transition-all shadow shadow-orange-200/50 flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5 stroke-[3px]" />
                         <span>Allocate New SKU Stock</span>
@@ -2479,7 +2515,7 @@ export default function Locations() {
                       {!selectedItemToAlloc ? (
                         <div className="space-y-3 animate-in fade-in slide-in-from-right duration-200">
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-widest">Select Variant Item</span>
+                            <span className="text-[9px] font-extrabold text-[#f05a3e] uppercase tracking-widest">Select Variant Item</span>
                             <button 
                               onClick={() => setIsAddingToLevel(false)}
                               className="text-[9px] font-black text-slate-400 hover:text-slate-800 uppercase"
@@ -2495,7 +2531,7 @@ export default function Locations() {
                               placeholder="Type stock name..."
                               value={addingLevelSearch}
                               onChange={(e) => setAddingLevelSearch(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-8 pr-3 text-[11px] font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-8 pr-3 text-[11px] font-bold text-slate-800 outline-none focus:bg-white focus:border-[#f05a3e]"
                             />
                           </div>
 
@@ -2514,13 +2550,13 @@ export default function Locations() {
                                     setSelectedItemToAlloc(item);
                                     setAllocQtyInput(String(item.qty || 1));
                                   }}
-                                  className="p-2 border border-slate-100 hover:border-blue-400 bg-slate-50/20 hover:bg-white rounded-lg cursor-pointer transition-colors flex justify-between items-center text-[10.5px] font-bold"
+                                  className="p-2 border border-slate-100 hover:border-[#f05a3e]/50 bg-slate-50/20 hover:bg-white rounded-lg cursor-pointer transition-colors flex justify-between items-center text-[10.5px] font-bold"
                                 >
                                   <div className="flex items-center gap-1.5 truncate">
                                     <span className="w-2 rounded shrink-0 h-2" style={{ backgroundColor: boxColor }} />
                                     <span className="truncate uppercase text-slate-800">{item.name}</span>
                                   </div>
-                                  <span className="text-[8.5px] font-mono text-blue-600 shrink-0">CHOOSE</span>
+                                  <span className="text-[8.5px] font-mono text-[#f05a3e] shrink-0">CHOOSE</span>
                                 </div>
                               );
                             })}
@@ -2574,7 +2610,7 @@ export default function Locations() {
                             </button>
                             <button 
                               onClick={handleConfirmAllocationQty}
-                              className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[9px] font-black uppercase transition-all shadow-md active:scale-95"
+                              className="flex-1 py-1.5 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-lg text-[9px] font-black uppercase transition-all shadow-md active:scale-95"
                             >
                               Confirm
                             </button>
@@ -2617,26 +2653,313 @@ export default function Locations() {
             )}
           </button>
         </div>
+        ) : (
+          /* LANE LABELS & ZONE CUSTOMIZER (The "Label Page" as requested) */
+          <div className="flex-1 bg-slate-50 border border-slate-200 rounded-[20px] p-6 shadow-3xs flex flex-col gap-5 overflow-y-auto min-h-[350px]">
+            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-3xs">
+              <h1 className="text-xl font-black text-slate-850 uppercase tracking-widest flex items-center gap-2">
+                <span>🏷️ Lane Label Mapping Console</span>
+              </h1>
+              <p className="text-[10.5px] text-slate-500 font-bold uppercase mt-1">
+                Configure real-time R3F 3D floor markers, sector boundaries, and path codes.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {visualZones.map((zone) => {
+                const zoneRacks = racks.filter(r => {
+                  try {
+                    return getZoneByZ(r.position[2], visualZones).name === zone.name;
+                  } catch (e) {
+                    return r.zone === zone.name;
+                  }
+                });
+
+                return (
+                  <div 
+                    key={`zone-card-${zone.name}`} 
+                    className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-2xs transition-all flex flex-col md:flex-row gap-5 items-center justify-between"
+                  >
+                    {/* Identification */}
+                    <div className="flex items-center gap-3.5 w-full md:w-auto shrink-0">
+                      <div 
+                        className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-[10px] shadow-sm shrink-0"
+                        style={{ backgroundColor: zone.color }}
+                      >
+                        {zone.lane.substring(0, 5)}
+                      </div>
+                      <div>
+                        <h4 className="text-[11px] font-black uppercase text-slate-800 tracking-wider">
+                          System {zone.name}
+                        </h4>
+                        <span className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 rounded text-[8.5px] font-extrabold text-slate-500 mt-1 uppercase tracking-wider">
+                          🏠 {zoneRacks.length} {zoneRacks.length === 1 ? 'Structure' : 'Structures'} Placed
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Editor inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
+                      {/* Lane Name Editor */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-extrabold text-[#8A7A6E] uppercase tracking-wider block">Lane Identifier code</label>
+                        <input
+                          type="text"
+                          value={zone.lane}
+                          placeholder="e.g. LANE 3"
+                          onChange={(e) => updateZoneField(zone.id, { lane: e.target.value })}
+                          className="w-full text-xs font-bold text-slate-850 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:bg-white focus:border-[#f05a3e] outline-none transition-all"
+                        />
+                      </div>
+
+                      {/* Boundary Label Tag Editor */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-extrabold text-[#8A7A6E] uppercase tracking-wider block">Long-Form Boundary Label Tag</label>
+                        <input
+                          type="text"
+                          value={zone.label}
+                          placeholder="e.g. CORE CENTRAL WAREHOUSE BAY"
+                          onChange={(e) => updateZoneField(zone.id, { label: e.target.value })}
+                          className="w-full text-xs font-bold text-slate-850 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:bg-white focus:border-[#f05a3e] outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Display Color Accent preset */}
+                    <div className="flex flex-col gap-1 items-start md:items-end w-full md:w-auto shrink-0">
+                      <span className="text-[8px] font-extrabold text-[#8A7A6E] uppercase tracking-wider block">Display Color Accent</span>
+                      <div className="flex gap-1.5 mt-1.5 font-bold">
+                        {['#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'].map((colorHex) => (
+                          <button
+                            key={colorHex}
+                            type="button"
+                            onClick={() => updateZoneField(zone.id, { color: colorHex })}
+                            className={cn(
+                              "w-4 h-4 rounded-full border border-slate-200 cursor-pointer transition-all",
+                              zone.color === colorHex ? "scale-125 ring-2 ring-slate-800" : "opacity-60 hover:opacity-100"
+                            )}
+                            style={{ backgroundColor: colorHex }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Right Sidebar - Properties & Level Content Sub-layers */}
       <aside className="w-full lg:w-96 bg-white border border-slate-200 rounded-lg flex flex-col p-5 shadow-sm overflow-y-auto h-full max-h-full">
         <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-3">
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-blue-600" />
-            <span>Rack Console</span>
+            {activeBoxPopup ? (
+              <>
+                <Package className="w-4 h-4 text-[#f05a3e]" />
+                <span>Item Inspector</span>
+              </>
+            ) : (
+              <>
+                <Sliders className="w-4 h-4 text-[#f05a3e]" />
+                <span>Rack Console</span>
+              </>
+            )}
           </h2>
           <div className="flex items-center gap-2">
             <span className={cn(
               "px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded",
-              selectedRack ? "bg-blue-100 text-blue-700 font-bold" : "bg-slate-100 text-slate-400 font-normal"
+              activeBoxPopup ? "bg-[#f05a3e]/10 text-[#f05a3e] font-extrabold" : selectedRack ? "bg-orange-100 text-[#d44327] font-bold" : "bg-slate-100 text-slate-400 font-normal"
             )}>
-              {selectedRack ? 'Active' : 'Unselected'}
+              {activeBoxPopup ? 'Selected SKU' : selectedRack ? 'Active' : 'Unselected'}
             </span>
           </div>
         </div>
 
-        {selectedRack ? (
+        {activeBoxPopup ? (
+          <div className="space-y-6 animate-in slide-up duration-300">
+            {/* Item Identification Block */}
+            <div className="p-4 bg-slate-50 border border-slate-150 rounded-xl relative overflow-hidden flex items-center gap-3.5 text-left">
+              <div className="w-12 h-12 rounded-2xl bg-[#f05a3e]/10 border border-[#f05a3e]/20 flex items-center justify-center text-[#f05a3e] shrink-0">
+                <Package className="w-6 h-6 animate-pulse" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest leading-none",
+                    activeBoxPopup.type === 'reservation' ? "bg-amber-100 border border-amber-250 text-amber-800" : "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                  )}>
+                    {activeBoxPopup.type === 'reservation' ? 'Reservation Hold' : 'Standard Inventory'}
+                  </span>
+                </div>
+                <h3 className="text-sm font-extrabold text-slate-800 uppercase truncate mt-1 leading-tight">{activeBoxPopup.name}</h3>
+                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Cabinet ID: {activeBoxPopup.id.substring(0, 8)}...</p>
+              </div>
+              <button 
+                onClick={() => setActiveBoxPopup(null)}
+                className="absolute top-2 right-2 p-1.5 hover:bg-slate-200/50 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
+                title="Deselect Item"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Placement Details Card */}
+            <div className="space-y-3 bg-slate-50/50 p-4 rounded-xl border border-slate-100 shadow-3xs text-left">
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block border-b border-orange-100 pb-1.5">Physical Shelf Space Placement</span>
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <span className="text-[8px] font-black uppercase text-slate-400 block">Structure</span>
+                  <span className="text-xs font-black text-slate-700 block uppercase tracking-wide mt-0.5">{activeBoxPopup.rackName}</span>
+                </div>
+                <div>
+                  <span className="text-[8px] font-black uppercase text-slate-400 block">Deck Level Index</span>
+                  <span className="text-xs font-black text-[#f05a3e] block uppercase mt-0.5">Level {Number(activeBoxPopup.levelIndex) + 1}</span>
+                </div>
+              </div>
+              {activeBoxPopup.type === 'reservation' && (
+                <div className="border-t border-slate-150 pt-3 mt-1.5 space-y-2">
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-slate-400 block">Client Account</span>
+                      <span className="text-[11px] font-extrabold text-slate-750 block truncate mt-0.5 uppercase">{activeBoxPopup.clientName || 'N/A Guest'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-slate-400 block">Hold Order ID</span>
+                      <span className="text-[11px] font-mono font-black text-slate-800 block truncate mt-0.5">{activeBoxPopup.orderId || 'N/A Order'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Horizontal position slider to click and slide cargo left or right on shelves */}
+            <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-150 text-left">
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] font-extrabold uppercase text-slate-500 tracking-wider">Slide Horizontal Position Pin</span>
+                <span className="font-mono text-[10px] font-bold text-[#f05a3e]">
+                  {activeBoxOffset === 0 ? "Center Position" : activeBoxOffset < 0 ? `${Math.abs(Math.round(activeBoxOffset * 200))}% Left` : `${Math.round(activeBoxOffset * 200)}% Right`}
+                </span>
+              </div>
+              <input 
+                type="range"
+                min="-0.5"
+                max="0.5"
+                step="0.05"
+                value={activeBoxOffset}
+                onChange={async (e) => {
+                  const val = parseFloat(e.target.value);
+                  setActiveBoxOffset(val);
+                  
+                  // Save offset value directly to Firestore & RTDB !
+                  if (activeBoxPopup.type === 'standard') {
+                    await updateDoc(doc(db, 'inventory', activeBoxPopup.id), { shelfOffset: val });
+                    try { await update(ref(rtdb, `inventory/${activeBoxPopup.id}`), { shelfOffset: val }); } catch (r_err) {}
+                  } else {
+                    await updateDoc(doc(db, 'reservations', activeBoxPopup.id), { shelfOffset: val });
+                    try { await update(ref(rtdb, `reservations/${activeBoxPopup.id}`), { shelfOffset: val }); } catch (r_err) {}
+                  }
+                }}
+                className="w-full accent-[#f05a3e] h-1 bg-slate-205 rounded cursor-ew-resize appearance-none"
+              />
+              <div className="flex justify-between text-[7px] text-slate-450 font-extrabold uppercase tracking-wide">
+                <span>← Left Side</span>
+                <span>Center Range</span>
+                <span>Right Side →</span>
+              </div>
+            </div>
+
+            {/* Variable Quantity Adjuster inside Sidepanel */}
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-150 text-left">
+              <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest block border-b border-orange-100 pb-1.5 font-bold">Modify Allocation Quantity</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const currentVal = Number(activeBoxPopup.qty) || 1;
+                    if (currentVal > 1) {
+                      const nextVal = currentVal - 1;
+                      setActiveBoxPopup(prev => prev ? { ...prev, qty: nextVal } : null);
+                      if (activeBoxPopup.type === 'standard') {
+                        await updateDoc(doc(db, 'inventory', activeBoxPopup.id), { qty: nextVal });
+                        try { await update(ref(rtdb, `inventory/${activeBoxPopup.id}`), { qty: nextVal }); } catch (r_err) {}
+                      } else {
+                        await updateDoc(doc(db, 'reservations', activeBoxPopup.id), { qty: nextVal });
+                        try { await update(ref(rtdb, `reservations/${activeBoxPopup.id}`), { qty: nextVal }); } catch (r_err) {}
+                      }
+                    }
+                  }}
+                  className="w-10 h-10 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-105 text-slate-600 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                >
+                  <Minus className="w-3.5 h-3.5 stroke-[3px]" />
+                </button>
+
+                <input 
+                  type="number"
+                  min="1"
+                  value={activeBoxPopup.qty}
+                  onChange={async (e) => {
+                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                    setActiveBoxPopup(prev => prev ? { ...prev, qty: val } : null);
+                    if (activeBoxPopup.type === 'standard') {
+                      await updateDoc(doc(db, 'inventory', activeBoxPopup.id), { qty: val });
+                      try { await update(ref(rtdb, `inventory/${activeBoxPopup.id}`), { qty: val }); } catch (r_err) {}
+                    } else {
+                      await updateDoc(doc(db, 'reservations', activeBoxPopup.id), { qty: val });
+                      try { await update(ref(rtdb, `reservations/${activeBoxPopup.id}`), { qty: val }); } catch (r_err) {}
+                    }
+                  }}
+                  className="w-full text-center border border-slate-200 rounded-xl h-10 px-3 text-xs font-bold text-slate-800 outline-none focus:border-[#f05a3e] focus:bg-white shadow-3xs bg-white"
+                />
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const currentVal = Number(activeBoxPopup.qty) || 0;
+                    const nextVal = currentVal + 1;
+                    setActiveBoxPopup(prev => prev ? { ...prev, qty: nextVal } : null);
+                    if (activeBoxPopup.type === 'standard') {
+                      await updateDoc(doc(db, 'inventory', activeBoxPopup.id), { qty: nextVal });
+                      try { await update(ref(rtdb, `inventory/${activeBoxPopup.id}`), { qty: nextVal }); } catch (r_err) {}
+                    } else {
+                      await updateDoc(doc(db, 'reservations', activeBoxPopup.id), { qty: nextVal });
+                      try { await update(ref(rtdb, `reservations/${activeBoxPopup.id}`), { qty: nextVal }); } catch (r_err) {}
+                    }
+                  }}
+                  className="w-10 h-10 shrink-0 flex items-center justify-center bg-white border border-slate-200 rounded-xl hover:bg-slate-105 text-slate-600 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3px]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Action options inside sidebar */}
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeBoxPopup.type === 'standard') {
+                    handleUnassignItem(activeBoxPopup.id);
+                  } else {
+                    handleUnassignReservation(activeBoxPopup.id);
+                  }
+                  setActiveBoxPopup(null);
+                }}
+                className="w-full py-3 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 text-[10px] font-extrabold uppercase tracking-widest rounded-xl transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>📦 Unload SKU Assignment</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveBoxPopup(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all border border-slate-200 cursor-pointer"
+              >
+                Close Info Sheet
+              </button>
+            </div>
+          </div>
+        ) : selectedRack ? (
           <div className="space-y-6 animate-in slide-up duration-300">
             {isRackOverlapping(selectedRack) && (
               <div id="spatial-collision-warning" className="bg-rose-50 border border-rose-200/60 rounded-xl p-3.5 text-rose-900 flex items-start gap-2.5 animate-in fade-in zoom-in-95 duration-200">
@@ -2672,7 +2995,7 @@ export default function Locations() {
                       setEditName(e.target.value); 
                       debouncedUpdateRackProperty({ name: e.target.value }); 
                     }}
-                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500"
+                    className="w-full text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#f05a3e]"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2714,7 +3037,7 @@ export default function Locations() {
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] font-bold">
                   <span className="text-slate-600">Base Width (X-span)</span>
-                  <span className="text-blue-600">{(selectedRack.width ?? 2.0).toFixed(1)}m</span>
+                  <span className="text-[#f05a3e]">{(selectedRack.width ?? 2.0).toFixed(1)}m</span>
                 </div>
                 <input 
                   type="range" 
@@ -2723,7 +3046,7 @@ export default function Locations() {
                   step="0.1"
                   value={selectedRack.width ?? 2.0}
                   onChange={(e) => debouncedUpdateRackProperty({ width: parseFloat(e.target.value) })}
-                  className="w-full accent-blue-600 cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
+                  className="w-full accent-[#f05a3e] cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
                 />
               </div>
 
@@ -2731,7 +3054,7 @@ export default function Locations() {
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] font-bold">
                   <span className="text-slate-600">Enclosure Length (Z-span)</span>
-                  <span className="text-blue-600">{(selectedRack.length ?? 0.8).toFixed(1)}m</span>
+                  <span className="text-[#f05a3e]">{(selectedRack.length ?? 0.8).toFixed(1)}m</span>
                 </div>
                 <input 
                   type="range" 
@@ -2740,7 +3063,7 @@ export default function Locations() {
                   step="0.1"
                   value={selectedRack.length ?? 0.8}
                   onChange={(e) => debouncedUpdateRackProperty({ length: parseFloat(e.target.value) })}
-                  className="w-full accent-blue-600 cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
+                  className="w-full accent-[#f05a3e] cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
                 />
               </div>
 
@@ -2748,7 +3071,7 @@ export default function Locations() {
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] font-bold">
                   <span className="text-slate-600">Shelf Tiers (Y-layers)</span>
-                  <span className="text-blue-600">{selectedRack.levelsCount ?? 3} Deck Levels</span>
+                  <span className="text-[#f05a3e]">{selectedRack.levelsCount ?? 3} Deck Levels</span>
                 </div>
                 <input 
                   type="range" 
@@ -2763,205 +3086,14 @@ export default function Locations() {
                       setSelectedLevelIndex(newLevels - 1);
                     }
                   }}
-                  className="w-full accent-blue-600 cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
+                  className="w-full accent-[#f05a3e] cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
                 />
               </div>
             </div>
 
             {/* Informational keyboard positioning tip */}
-            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-150 text-[9.5px] text-slate-500 leading-snug">
+            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-150 text-[9.5px] text-slate-500 leading-snug" id="repaired-tip-panel">
               💡 <strong className="font-extrabold text-slate-700">Pro-Tip:</strong> Click the rack structure in the 3D scene, then use keyboard hotkeys <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">W</kbd> <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">A</kbd> <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">S</kbd> <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">D</kbd> and <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">Q</kbd> / <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">E</kbd> for rapid precision alignment. Hold <kbd className="bg-white border border-slate-250 rounded px-1 font-mono text-[9px] text-slate-700 shadow-3xs">Shift</kbd> for 1.0m strides!
-            </div>
-            <div className="space-y-4 pt-4 border-t border-slate-100">
-              <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <Layout className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                <span>3D Architectural Sketch Elements</span>
-              </h3>
-
-              {/* Creator Button Grid */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => addSketchItem('wall')}
-                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95Group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-slate-200/50 flex items-center justify-center text-slate-600 font-bold text-xs">W</div>
-                  <span className="text-[9.5px] font-bold">Add Wall</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSketchItem('window')}
-                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95Group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-xs font-mono">🪟</div>
-                  <span className="text-[9.5px] font-bold">Add Window</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSketchItem('door')}
-                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95Group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">🚪</div>
-                  <span className="text-[9.5px] font-bold">Add Door</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => addSketchItem('toilet_bowl')}
-                  className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95Group"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
-                  <span className="text-[9.5px] font-bold">Add Toilet</span>
-                </button>
-              </div>
-
-              {/* Highlight / Details of the Selected 3D Sketch Element */}
-              {selectedSketchItem ? (
-                <div className="space-y-3.5 bg-blue-50/20 p-3.5 rounded-2xl border border-blue-105 active:ring-1 active:ring-blue-400">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-wider font-mono">Active Element Editor</span>
-                    <button
-                       type="button"
-                       onClick={() => deleteSketchItem(selectedSketchItem.id)}
-                       className="text-[9px] font-extrabold text-rose-500 hover:text-rose-600 uppercase cursor-pointer"
-                    >
-                      Delete Item
-                    </button>
-                  </div>
-
-                  {freeMoveActive && (
-                    <div className="bg-sky-50 border border-sky-100 text-sky-850 p-2 rounded-xl text-center shadow-3xs shrink-0">
-                      <span className="text-[9px] font-black uppercase tracking-wider block">🚀 Free Moving Mode Active</span>
-                      <span className="text-[8px] font-bold block text-sky-600 leading-none mt-0.5">Drag any axis, rotate, or elevate!</span>
-                    </div>
-                  )}
-
-                  {/* Name field */}
-                  <div className="space-y-1">
-                    <label className="text-[8.5px] font-extrabold text-slate-450 uppercase block">Element Label Name</label>
-                    <input 
-                      type="text"
-                      value={selectedSketchItem.name || ''}
-                      onChange={(e) => updateSketchItemProperty(selectedSketchItem.id, { name: e.target.value })}
-                      className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500"
-                    />
-                  </div>
-
-                  {/* Size Adjusters / Resizers */}
-                  <div className="space-y-2 border-t border-blue-50/50 pt-2.5">
-                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block font-bold leading-none">Element Sizing (Thickness / Lengths)</span>
-                    
-                    {/* Width Slider */}
-                    <div className="space-y-0.5">
-                      <div className="flex justify-between text-[8px] font-bold text-slate-500">
-                        <span>Width (X-Span)</span>
-                        <span className="font-mono font-bold text-slate-700">{selectedSketchItem.size[0].toFixed(1)}m</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0.5"
-                        max="18.0"
-                        step="0.1"
-                        value={selectedSketchItem.size[0]}
-                        onChange={(e) => {
-                          const w = parseFloat(e.target.value);
-                          updateSketchItemProperty(selectedSketchItem.id, {
-                            size: [w, selectedSketchItem.size[1], selectedSketchItem.size[2]]
-                          });
-                        }}
-                        className="w-full accent-blue-600 h-1 bg-slate-202 roundedAppearance cursor-ew-resize"
-                      />
-                    </div>
-
-                    {/* Height Slider */}
-                    <div className="space-y-0.5">
-                      <div className="flex justify-between text-[8px] font-bold text-slate-500">
-                        <span>Height (Y-Rise)</span>
-                        <span className="font-mono font-bold text-slate-700">{selectedSketchItem.size[1].toFixed(1)}m</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0.5"
-                        max="8.0"
-                        step="0.1"
-                        value={selectedSketchItem.size[1]}
-                        onChange={(e) => {
-                          const h = parseFloat(e.target.value);
-                          updateSketchItemProperty(selectedSketchItem.id, {
-                            size: [selectedSketchItem.size[0], h, selectedSketchItem.size[2]],
-                            position: [selectedSketchItem.position[0], h/2, selectedSketchItem.position[2]] // keeps on ground level
-                          });
-                        }}
-                        className="w-full accent-blue-600 h-1 bg-slate-202 roundedAppearance cursor-ew-resize"
-                      />
-                    </div>
-
-                    {/* Thickness Slider */}
-                    <div className="space-y-0.5">
-                      <div className="flex justify-between text-[8px] font-bold text-slate-500">
-                        <span>Thickness (Depth)</span>
-                        <span className="font-mono font-bold text-slate-700">{selectedSketchItem.size[2].toFixed(1)}m</span>
-                      </div>
-                      <input 
-                        type="range"
-                        min="0.05"
-                        max="2.0"
-                        step="0.05"
-                        value={selectedSketchItem.size[2]}
-                        onChange={(e) => {
-                          const d = parseFloat(e.target.value);
-                          updateSketchItemProperty(selectedSketchItem.id, {
-                            size: [selectedSketchItem.size[0], selectedSketchItem.size[1], d]
-                          });
-                        }}
-                        className="w-full accent-blue-600 h-1 bg-slate-202 roundedAppearance cursor-ew-resize"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Orientation Rotations Slider */}
-                  <div className="space-y-1.5 border-t border-blue-50/50 pt-2.5">
-                    <div className="flex justify-between text-[8px] font-bold text-slate-500 uppercase tracking-widest leading-none">
-                      <span>Rotation Yaw (Angle)</span>
-                      <span className="font-mono font-bold text-slate-600">{Math.round((selectedSketchItem.rotation || 0) * (180 / Math.PI))}°</span>
-                    </div>
-                    <input 
-                      type="range"
-                      min="-3.1415"
-                      max="3.1415"
-                      step="0.05"
-                      value={selectedSketchItem.rotation || 0}
-                      onChange={(e) => {
-                        updateSketchItemProperty(selectedSketchItem.id, { rotation: parseFloat(e.target.value) });
-                      }}
-                      className="w-full accent-indigo-600 h-1 bg-slate-202 roundedAppearance cursor-ew-resize"
-                    />
-                  </div>
-
-                  {/* Color Preset Palette Selection */}
-                  <div className="space-y-1.5 border-t border-blue-50/50 pt-2.5">
-                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block">Material Preset Accent Color</span>
-                    <div className="flex gap-2">
-                      {['#e2e8f0', '#cbd5e1', '#64748b', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#b45309', '#451a03'].map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => updateSketchItemProperty(selectedSketchItem.id, { color: c })}
-                          className={cn(
-                            "w-4 h-4 rounded-full border border-slate-200 cursor-pointer shadow-3xs transition-transform active:scale-75",
-                            selectedSketchItem.color === c ? "scale-125 ring-2 ring-blue-500 ring-offset-1" : ""
-                          )}
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-slate-50 border border-dashed border-slate-200 p-4 rounded-xl text-center">
-                  <p className="text-[10px] text-slate-400 italic">No element selected.</p>
-                  <p className="text-[9.5px] text-slate-450 mt-1">Double click elements in the 3D floor map to adjust parameters or use the creation buttons above.</p>
-                </div>
-              )}
             </div>
           </div>
         ) : selectedSketchItem ? (
@@ -2969,7 +3101,7 @@ export default function Locations() {
           <div className="space-y-6 animate-in slide-up duration-300">
             <div className="space-y-4">
               <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <Layout className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                <Layout className="w-3.5 h-3.5 text-[#f05a3e] animate-pulse" />
                 <span>3D Architectural Sketch Elements</span>
               </h3>
 
@@ -3004,15 +3136,15 @@ export default function Locations() {
                   onClick={() => addSketchItem('toilet_bowl')}
                   className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
+                  <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-[#f05a3e] font-bold text-xs">🚽</div>
                   <span className="text-[9.5px] font-bold">Add Toilet</span>
                 </button>
               </div>
 
               {/* Active element properties editor */}
-              <div className="space-y-3.5 bg-blue-50/20 p-3.5 rounded-2xl border border-blue-100 active:ring-1 active:ring-blue-400">
+              <div className="space-y-3.5 bg-orange-50/20 p-3.5 rounded-2xl border border-orange-100 active:ring-1 active:ring-[#f05a3e]/40">
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-wider font-mono font-bold">Active Element Editor</span>
+                  <span className="text-[9px] font-extrabold text-[#f05a3e] uppercase tracking-wider font-mono font-bold">Active Element Editor</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -3032,12 +3164,12 @@ export default function Locations() {
                     type="text"
                     value={selectedSketchItem.name || ''}
                     onChange={(e) => updateSketchItemProperty(selectedSketchItem.id, { name: e.target.value })}
-                    className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500"
+                    className="w-full bg-white border border-slate-200 rounded-lg py-1.5 px-2.5 text-[11px] font-bold text-slate-800 outline-none focus:border-[#f05a3e]"
                   />
                 </div>
 
                 {/* Size Adjusters / Resizers */}
-                <div className="space-y-2 border-t border-blue-100 pt-2.5">
+                <div className="space-y-2 border-t border-orange-100 pt-2.5">
                   <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest block font-bold leading-none animate-fade-in">Element Sizing</span>
                   
                   {/* Width Slider */}
@@ -3058,7 +3190,7 @@ export default function Locations() {
                           size: [w, selectedSketchItem.size[1], selectedSketchItem.size[2]]
                         });
                       }}
-                      className="w-full accent-blue-600 h-1 bg-slate-200 rounded cursor-ew-resize"
+                      className="w-full accent-[#f05a3e] h-1 bg-slate-200 rounded cursor-ew-resize"
                     />
                   </div>
 
@@ -3081,7 +3213,7 @@ export default function Locations() {
                           position: [selectedSketchItem.position[0], h/2, selectedSketchItem.position[2]]
                         });
                       }}
-                      className="w-full accent-blue-600 h-1 bg-slate-200 rounded cursor-ew-resize"
+                      className="w-full accent-[#f05a3e] h-1 bg-slate-200 rounded cursor-ew-resize"
                     />
                   </div>
 
@@ -3103,7 +3235,7 @@ export default function Locations() {
                           size: [selectedSketchItem.size[0], selectedSketchItem.size[1], d]
                         });
                       }}
-                      className="w-full accent-blue-600 h-1 bg-slate-200 rounded cursor-ew-resize"
+                      className="w-full accent-[#f05a3e] h-1 bg-slate-200 rounded cursor-ew-resize"
                     />
                   </div>
                 </div>
@@ -3123,7 +3255,7 @@ export default function Locations() {
                     onChange={(e) => {
                       updateSketchItemProperty(selectedSketchItem.id, { rotation: parseFloat(e.target.value) });
                     }}
-                    className="w-full accent-indigo-600 h-1 bg-slate-200"
+                    className="w-full accent-[#f05a3e] h-1 bg-slate-200"
                   />
                 </div>
 
@@ -3164,7 +3296,7 @@ export default function Locations() {
 
               <div className="space-y-4 pt-1">
                 <h3 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                  <Layout className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                  <Layout className="w-3.5 h-3.5 text-[#f05a3e] animate-pulse" />
                   <span>3D Architectural Sketch Elements</span>
                 </h3>
 
@@ -3199,7 +3331,7 @@ export default function Locations() {
                     onClick={() => addSketchItem('toilet_bowl')}
                     className="bg-slate-50 hover:bg-slate-100 text-slate-700 p-2.5 rounded-xl border border-slate-205 flex flex-col items-center gap-1.5 transition-all text-center cursor-pointer hover:shadow-2xs active:scale-95"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">🚽</div>
+                    <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-[#f05a3e] font-bold text-xs">🚽</div>
                     <span className="text-[9.5px] font-bold">Add Toilet</span>
                   </button>
                 </div>
@@ -3233,10 +3365,10 @@ export default function Locations() {
       {/* Level details consolidated in-canvas floating drawer. Old modal disabled. */}
               {false && (<>
               {/* Modal Header */}
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-blue-50/50">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-orange-50/50">
                 <div>
                   <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-blue-600 animate-pulse" />
+                    <Layers className="w-4 h-4 text-[#f05a3e] animate-pulse" />
                     <span>Level {levelPopout.levelIndex + 1} Deck Details</span>
                   </h3>
                   <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
@@ -3333,7 +3465,7 @@ export default function Locations() {
                         setIsAddingToLevel(true);
                         setAddingLevelSearch('');
                       }}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-2"
+                      className="w-full py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 mt-2"
                     >
                       <Plus className="w-4 h-4 stroke-[3px]" />
                       <span>Add</span>
@@ -3345,7 +3477,7 @@ export default function Locations() {
                     {!selectedItemToAlloc ? (
                       <div className="space-y-4 animate-in slide-in-from-right duration-200">
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest">Select Stock Item</span>
+                          <span className="text-[10px] font-extrabold text-[#f05a3e] uppercase tracking-widest">Select Stock Item</span>
                           <button 
                             onClick={() => setIsAddingToLevel(false)}
                             className="text-xs font-black text-slate-500 hover:text-slate-800 uppercase"
@@ -3362,7 +3494,7 @@ export default function Locations() {
                             placeholder="Find product by name..."
                             value={addingLevelSearch}
                             onChange={(e) => setAddingLevelSearch(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-9 pr-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-blue-500 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-9 pr-4 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-[#f05a3e] transition-colors"
                           />
                         </div>
 
@@ -3386,7 +3518,7 @@ export default function Locations() {
                                     setSelectedItemToAlloc(item);
                                     setAllocQtyInput(String(item.qty || 1));
                                   }}
-                                  className="p-3 rounded-xl border border-slate-100 hover:border-blue-400 bg-slate-50/40 hover:bg-slate-50 cursor-pointer transition-all flex justify-between items-center"
+                                  className="p-3 rounded-xl border border-slate-100 hover:border-[#f05a3e]/50 bg-slate-50/40 hover:bg-slate-50 cursor-pointer transition-all flex justify-between items-center"
                                 >
                                   <div className="flex items-center gap-2 truncate">
                                     <span className="w-2.5 h-2.5 rounded shrink-0" style={{ backgroundColor: boxColor }} />
@@ -3398,7 +3530,7 @@ export default function Locations() {
                                         At: {locatedRack}
                                       </span>
                                     )}
-                                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest pl-2">Select</span>
+                                    <span className="text-[10px] font-bold text-[#f05a3e] uppercase tracking-widest pl-2">Select</span>
                                   </div>
                                 </div>
                               );
@@ -3437,7 +3569,7 @@ export default function Locations() {
                               min="1"
                               value={allocQtyInput}
                               onChange={(e) => setAllocQtyInput(e.target.value)}
-                              className="w-full text-center border border-slate-200 rounded-xl h-10 px-3 text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white shadow-xs bg-white"
+                              className="w-full text-center border border-slate-200 rounded-xl h-10 px-3 text-xs font-bold text-slate-800 outline-none focus:border-[#f05a3e] focus:bg-white shadow-xs bg-white"
                               placeholder="Quantity"
                             />
 
@@ -3454,6 +3586,30 @@ export default function Locations() {
                           </div>
                         </div>
 
+                        {/* Shelf Position Offset Slider */}
+                        <div className="space-y-1.5 p-4 bg-slate-50 rounded-xl border border-slate-150 text-left">
+                          <div className="flex justify-between items-center text-[10px] font-bold">
+                            <span className="text-slate-600 uppercase tracking-wider text-[8px]">Shelf Placement Position</span>
+                            <span className="font-mono text-[10px] font-bold text-[#f05a3e]">
+                              {allocShelfOffset === 0 ? "Center Placement" : allocShelfOffset < 0 ? `${Math.abs(Math.round(allocShelfOffset * 200))}% Left` : `${Math.round(allocShelfOffset * 200)}% Right`}
+                            </span>
+                          </div>
+                          <input 
+                            type="range"
+                            min="-0.5"
+                            max="0.5"
+                            step="0.05"
+                            value={allocShelfOffset}
+                            onChange={(e) => setAllocShelfOffset(parseFloat(e.target.value))}
+                            className="w-full accent-[#f05a3e] h-1 bg-slate-205 rounded cursor-ew-resize appearance-none"
+                          />
+                          <div className="flex justify-between text-[7px] text-slate-400 font-extrabold uppercase tracking-wide">
+                            <span>← Left End</span>
+                            <span>Middle</span>
+                            <span>Right End →</span>
+                          </div>
+                        </div>
+
                         {/* Confirmation Buttons */}
                         <div className="flex items-center gap-2.5 pt-2">
                           <button 
@@ -3464,7 +3620,7 @@ export default function Locations() {
                           </button>
                           <button 
                             onClick={handleConfirmAllocationQty}
-                            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all shadow-md active:scale-95"
+                            className="flex-1 py-2.5 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded-xl text-[10px] font-extrabold uppercase tracking-wider transition-all shadow-md active:scale-95"
                           >
                             Confirm Allocation
                           </button>
@@ -3501,12 +3657,12 @@ export default function Locations() {
             className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-slate-800 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-4 max-w-sm pointer-events-auto"
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping shrink-0" />
               <p className="text-[11px] font-semibold text-slate-200 tracking-wide">{undoAction.message}</p>
             </div>
             <button
               onClick={handleUndo}
-              className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors bg-blue-950/80 px-2.5 py-1 rounded-lg border border-blue-900/30 whitespace-nowrap cursor-pointer"
+              className="text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors bg-orange-950/80 px-2.5 py-1 rounded-lg border border-orange-900/30 whitespace-nowrap cursor-pointer"
             >
               Undo Action
             </button>

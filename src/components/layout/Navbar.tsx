@@ -11,7 +11,7 @@ export default function Navbar({ toggleSidebar, onLogout }: NavbarProps) {
   const initial = username.substring(0, 2).toUpperCase();
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 sticky top-0 z-30 flex items-center justify-between px-6">
+    <header className="h-16 bg-[#f4f5f7] sticky top-0 z-30 flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
         <button 
           onClick={toggleSidebar}
@@ -40,12 +40,18 @@ export default function Navbar({ toggleSidebar, onLogout }: NavbarProps) {
         
         {/* Dynamic User Profile Indicator */}
         <div className="flex items-center gap-2.5 p-1 px-2.5 bg-slate-50 border border-slate-100 rounded-xl select-none">
-          <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center text-white text-xs font-black uppercase shadow-xs">
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black uppercase shadow-xs ${
+            localStorage.getItem('epedu_role') === 'viewer' ? 'bg-amber-500' : 'bg-[#f05a3e]'
+          }`}>
             {initial}
           </div>
           <div className="hidden sm:block text-left mr-1">
             <p className="text-xs font-bold text-slate-800 leading-none">{username}</p>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1.5">Super Manager</p>
+            <p className={`text-[8px] font-black uppercase tracking-widest leading-none mt-1.5 ${
+              localStorage.getItem('epedu_role') === 'viewer' ? 'text-amber-500' : 'text-slate-400'
+            }`}>
+              {localStorage.getItem('epedu_role') === 'viewer' ? 'Viewer (Read-Only)' : (localStorage.getItem('epedu_role') === 'super_admin' ? 'Super Admin' : 'Manager')}
+            </p>
           </div>
         </div>
 

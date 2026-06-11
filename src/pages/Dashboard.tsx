@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Package, TrendingUp, AlertCircle, CheckCircle2, ArrowUpRight, ArrowDownRight, Plus, Scan, Tag, X, ChevronRight, Hash, Sliders, Bookmark, Search, MapPin } from 'lucide-react';
+import { Package, TrendingUp, AlertCircle, CheckCircle2, ArrowUpRight, ArrowDownRight, Plus, Scan, Tag, X, ChevronRight, Hash, Sliders, Bookmark, Search, MapPin, ChevronDown, ClipboardList } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/src/lib/utils';
 import { db, collection, addDoc, onSnapshot, serverTimestamp, updateDoc, doc, arrayUnion, query, orderBy, handleFirestoreError, OperationType, auth, rtdb, ref, onValue, set, update, setDoc } from '@/src/lib/firebase';
@@ -717,7 +717,7 @@ export default function Dashboard() {
   };
 
   const stats = [
-    { label: 'Total Inventory', value: inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString(), icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', change: '+12%', positive: true },
+    { label: 'Total Inventory', value: inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString(), icon: Package, color: 'text-[#f05a3e]', bg: 'bg-orange-50', change: '+12%', positive: true },
     { label: 'Registered SKU', value: inventory.length, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50', change: '+8%', positive: true },
     { label: 'Low Stock Items', value: inventory.filter(i => (Number(i.qty) || 0) < 5).length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50', change: '-3%', positive: false },
     { label: 'Warehouse Load', value: '88%', icon: CheckCircle2, color: 'text-rose-600', bg: 'bg-rose-50', change: '0%', positive: true },
@@ -765,143 +765,113 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-      <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      {/* Top Header Row with Title and Integrated Search as shown in the image */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">System Perspective</h1>
-          <p className="text-slate-500 text-[11px] uppercase tracking-wider font-semibold">EP Inventory Integration Hub</p>
+          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">Dashboard</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <a
-            href="https://imagekit.io/dashboard/media-library/L0VQRURVIElOVkVOVE9SWSA"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10.5px] font-extrabold uppercase tracking-wider transition-all hover:shadow shadow-sm active:scale-95 shrink-0"
-          >
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            ImageKit Link
-          </a>
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[10.5px] font-extrabold uppercase tracking-wider hover:bg-slate-800 transition-all hover:shadow shadow-sm active:scale-95 shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add New Stock
-          </button>
-        </div>
-      </header>
-
-      {/* Stock Locator Search Banner */}
-      <div id="dashboard-stock-locator" className="bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent p-5 rounded-2xl border border-blue-200/50 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h2 className="text-xs font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
-            <Search className="w-4 h-4 animate-pulse text-blue-600" />
-            Stock Locator Search Hub
-          </h2>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-            Find exactly which Rack and Shelf Level any inventory SKU is located on in real-time.
-          </p>
-        </div>
-        <div className="relative flex-1 max-w-sm w-full">
-          <div className="relative">
+        <div id="dashboard-stock-locator" className="flex items-center gap-4 shrink-0 max-w-md w-full sm:w-auto">
+          {/* Integrated Header "Search anything" input bar */}
+          <div className="relative flex-1 sm:w-72">
             <input
               type="text"
-              placeholder="Type product name to locate... (e.g. mBot)"
+              placeholder="Search anything"
               value={dashboardSearchText}
               onChange={(e) => {
                 setDashboardSearchText(e.target.value);
                 setShowDashboardSearchDropdown(true);
               }}
               onFocus={() => setShowDashboardSearchDropdown(true)}
-              className="w-full bg-white border border-slate-200 focus:border-blue-500 rounded-xl py-2.5 pl-4 pr-10 text-xs font-bold text-slate-800 outline-none shadow-xs transition-all focus:ring-4 focus:ring-blue-100"
+              className="w-full bg-white/70 backdrop-blur-md border border-slate-200 focus:border-[#f05a3e] rounded-full py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none shadow-3xs transition-all focus:ring-4 focus:ring-[#f05a3e]/10"
             />
-            <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          </div>
-          
-          {/* Autocomplete Dropdown */}
-          {showDashboardSearchDropdown && dashboardSearchText.trim() && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setShowDashboardSearchDropdown(false)} 
-              />
-              <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 space-y-1">
-                {inventory.filter(item => 
-                  item.name.toLowerCase().includes(dashboardSearchText.toLowerCase())
-                ).length > 0 ? (
-                  inventory.filter(item => 
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            
+            {/* Autocomplete Dropdown */}
+            {showDashboardSearchDropdown && dashboardSearchText.trim() && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowDashboardSearchDropdown(false)} 
+                />
+                <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-white border border-[#eef0f3] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.06)] z-50 p-2.5 space-y-1">
+                  {inventory.filter(item => 
                     item.name.toLowerCase().includes(dashboardSearchText.toLowerCase())
-                  ).map((item, idx) => {
-                    const shelfLabel = item.rackId && item.rackLevel !== undefined && item.rackLevel !== -1 
-                      ? `${item.rackLevel !== undefined ? `Level ${Number(item.rackLevel) + 1}` : 'Rack Assigned'}`
-                      : null;
-                    return (
-                      <div
-                        key={`dash-search-${item.id}-${idx}`}
-                        onClick={() => {
-                          setDashboardSearchText(item.name);
-                          setSelectedLocateItem(item);
-                          setShowDashboardSearchDropdown(false);
-                        }}
-                        className="p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors"
-                      >
-                        <div>
-                          <p className="text-xs font-extrabold text-slate-800 uppercase leading-none">{item.name}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
-                            Qty: {item.qty} • Site: {item.location || 'Central'}
-                          </p>
+                  ).length > 0 ? (
+                    inventory.filter(item => 
+                      item.name.toLowerCase().includes(dashboardSearchText.toLowerCase())
+                    ).map((item, idx) => {
+                      const shelfLabel = item.rackId && item.rackLevel !== undefined && item.rackLevel !== -1 
+                        ? `Level ${Number(item.rackLevel) + 1}`
+                        : null;
+                      return (
+                        <div
+                          key={`dash-search-${item.id}-${idx}`}
+                          onClick={() => {
+                            setDashboardSearchText(item.name);
+                            setSelectedLocateItem(item);
+                            setShowDashboardSearchDropdown(false);
+                          }}
+                          className="p-2 rounded-xl hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors text-xs font-bold text-slate-700"
+                        >
+                          <div className="truncate">
+                            <p className="font-extrabold text-slate-900 uppercase leading-none truncate">{item.name}</p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                              Qty: {item.qty} • {item.location || 'Central'}
+                            </p>
+                          </div>
+                          {shelfLabel ? (
+                            <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded border border-emerald-150 uppercase tracking-widest">
+                              {shelfLabel}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-black bg-slate-50 text-slate-400 px-2 py-1 rounded border border-slate-100 uppercase tracking-widest">
+                              Unplaced
+                            </span>
+                          )}
                         </div>
-                        {shelfLabel ? (
-                          <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded border border-emerald-100 uppercase tracking-widest">
-                            {shelfLabel}
-                          </span>
-                        ) : (
-                          <span className="text-[8px] font-black bg-slate-50 text-slate-400 px-2 py-1 rounded border border-slate-100 uppercase tracking-widest">
-                            Unallocated
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="p-4 text-center text-xs text-slate-400 italic">No matching products found.</div>
-                )}
-              </div>
-            </>
-          )}
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-400 italic">No matching products found.</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Locator Results Card */}
+      {/* Locator Results Popout */}
       {selectedLocateItem && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 bg-white border-2 border-emerald-500/20 rounded-2xl shadow-sm flex flex-col md:flex-row gap-5 items-center justify-between"
+          className="p-5 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_35px_rgba(0,0,0,0.02)] flex flex-col md:flex-row gap-5 items-center justify-between"
         >
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-extrabold shrink-0">
-              <Package className="w-6 h-6 animate-bounce" />
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-extrabold shrink-0">
+              <Package className="w-6 h-6 text-emerald-600 animate-pulse" />
             </div>
             <div>
-              <p className="text-[9px] font-black tracking-wider uppercase text-emerald-600 mb-0.5">Stock Discovered & Location Mapped</p>
+              <p className="text-[9px] font-black tracking-wider uppercase text-emerald-600 mb-0.5">Item Discovered in Database</p>
               <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-tight leading-none">{selectedLocateItem.name}</h3>
               <p className="text-[11px] font-semibold text-slate-500 mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>Site Warehouse Location:</span>
-                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-800 font-bold uppercase text-[9.5px] border border-slate-200">
-                  {selectedLocateItem.location || 'Central Warehouse'}
+                <span>Site Warehouse:</span>
+                <span className="bg-slate-100 px-2.5 py-0.5 rounded-lg text-slate-800 font-bold uppercase text-[9px] border border-slate-200">
+                  {selectedLocateItem.location || 'Main Warehouse'}
                 </span>
                 {selectedLocateItem.rackId ? (
                   <>
                     <span className="text-slate-400">•</span>
-                    <span>Placed inside rack deck level:</span>
-                    <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-black uppercase text-[9.5px] border border-emerald-200">
+                    <span>Cabinet Placement:</span>
+                    <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-lg font-black uppercase text-[9px] border border-emerald-250">
                       Level {Number(selectedLocateItem.rackLevel) + 1}
                     </span>
                   </>
                 ) : (
                   <>
                     <span className="text-slate-400">•</span>
-                    <span className="text-rose-500 font-bold uppercase text-[10px]">No physical rack deck allocated yet</span>
+                    <span className="text-rose-500 font-extrabold uppercase text-[9px]">Unallocated on Rack Level</span>
                   </>
                 )}
               </p>
@@ -912,16 +882,14 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => {
-                  // Set local storage so Locations.tsx highlights on render
                   localStorage.setItem('locateStockItemId', selectedLocateItem.id);
                   localStorage.setItem('locateStockName', selectedLocateItem.name);
-                  // Dispatch tab change event
                   window.dispatchEvent(new CustomEvent('change-tab', { detail: 'locations' }));
                 }}
-                className="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow active:scale-95 flex items-center justify-center gap-1.5"
+                className="flex-1 md:flex-initial px-5 py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <MapPin className="w-3.5 h-3.5 stroke-[2.5px]" />
-                <span>Locate In 3D Warehouse Map 🔍</span>
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Locate In 3D Map 🔍</span>
               </button>
             )}
             <button
@@ -930,7 +898,7 @@ export default function Dashboard() {
                 setSelectedLocateItem(null);
                 setDashboardSearchText('');
               }}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors border border-slate-200"
+              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors border border-slate-200"
             >
               Clear
             </button>
@@ -938,163 +906,309 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.05 }}
-            key={`stat-${stat.label}-${idx}`}
-            className="p-5 bg-white rounded-lg border border-slate-200 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className={cn("p-1.5 rounded bg-slate-50 border border-slate-100 shrink-0")}>
-                <stat.icon className={cn("w-4 h-4 text-slate-500")} />
-              </div>
-              <div className={cn(
-                "text-[10px] font-bold px-1.5 py-0.5 rounded",
-                stat.positive ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-              )}>
-                {stat.change}
-              </div>
-            </div>
-            <div>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-none">{stat.label}</p>
-              <p className="text-xl font-extrabold text-slate-800 mt-1">{stat.value}</p>
-            </div>
-          </motion.div>
-        ))}
+      {/* Main Hero Card exactly as styled in the image */}
+      <div className="p-8 pb-10 bg-white border border-[#eef0f3] rounded-[32px] shadow-[0_12px_45px_rgba(0,0,0,0.015)] relative overflow-hidden flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
+        <div className="space-y-4 max-w-xl z-10">
+          <p className="text-slate-400 text-xs font-semibold tracking-wide">
+            Welcome Back, <span className="text-slate-800 font-extrabold">{localStorage.getItem('epedu_username') || "Xiofik Hasan"}</span>
+          </p>
+          <h2 className="text-4xl md:text-[50px] leading-[1.1] font-display font-medium text-slate-900 tracking-tight">
+            Inventory System
+          </h2>
+          <p className="text-slate-500 text-[13px] leading-relaxed max-w-lg font-medium">
+            Track inventory flow, fulfillment speed, and vendor efficiency — all updated in real time for smarter decisions.
+          </p>
+          <div className="pt-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setIsAddItemModalOpen(true)}
+              className="px-6 py-3.5 bg-[#f05a3e] hover:bg-[#d44327] text-white font-extrabold text-[11px] uppercase tracking-wider rounded-full transition-all shadow-[0_6px_20px_rgba(240,90,62,0.25)] active:scale-95 cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5px]" />
+              <span>Add New Item</span>
+            </button>
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[11px] uppercase tracking-wide rounded-full transition-all active:scale-95 cursor-pointer"
+            >
+              Add New Stock
+            </button>
+          </div>
+        </div>
+
+        {/* Isometric SVG Illustration of the Warehouse, roads, delivery lines identical to mockup */}
+        <div className="relative w-full max-w-[280px] xl:max-w-[340px] aspect-[1.3] z-10 shrink-0 self-center">
+          <svg viewBox="0 0 400 300" className="w-full h-full text-slate-200 select-none drop-shadow-sm">
+            {/* Grid line patterns */}
+            <g opacity="0.15">
+              <line x1="50" y1="150" x2="350" y2="150" stroke="#f05a3e" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="200" y1="50" x2="200" y2="250" stroke="#f05a3e" strokeWidth="1" strokeDasharray="3,3" />
+            </g>
+
+            {/* Pathways - Light Gray Roads in Isometic projection angle */}
+            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke="#eef0f3" strokeWidth="12" strokeLinecap="round" />
+            <path d="M 120,250 L 250,185 L 200,160 Z" fill="none" stroke="#eef0f3" strokeWidth="8" strokeLinejoin="round" />
+            <path d="M 250,185 L 350,235" fill="none" stroke="#eef0f3" strokeWidth="10" strokeLinecap="round" />
+
+            {/* Glowing Flow Paths - orange/red gradient stroke */}
+            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke="#f05a3e" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5, 15" className="animate-[dash_4s_linear_infinite]" style={{ strokeDashoffset: -20 }} />
+
+            {/* Isometric Cubes (Buildings/Warehouses) */}
+            {/* Building 1 - Left background block */}
+            <g transform="translate(140, 70)">
+              {/* Left face */}
+              <path d="M 0,25 L 25,12.5 L 25,50 L 0,62.5 Z" fill="#e2e8f0" />
+              {/* Right face */}
+              <path d="M 25,12.5 L 50,25 L 50,62.5 L 25,50 Z" fill="#cbd5e1" />
+              {/* Top face */}
+              <path d="M 0,25 L 25,12.5 L 50,25 L 25,37.5 Z" fill="#f8fafc" />
+            </g>
+
+            {/* Building 2 - Main Center red glowing entry point */}
+            <g transform="translate(260, 45)">
+              <path d="M 0,35 L 35,17.5 L 35,70 L 0,87.5 Z" fill="#cbd5e1" />
+              <path d="M 35,17.5 L 70,35 L 70,87.5 L 35,70 Z" fill="#94a3b8" />
+              <path d="M 0,35 L 35,17.5 L 70,35 L 35,52.5 Z" fill="#f1f5f9" />
+              {/* Soft red glow entrance door on side */}
+              <path d="M 10,65 L 25,57.5 L 25,80 L 10,87 Z" fill="#fecaca" />
+              <path d="M 13,67 L 22,62.5 L 22,78 L 13,82 Z" fill="#f05a3e" opacity="0.9" />
+            </g>
+
+            {/* Building 3 - Front small block layout */}
+            <g transform="translate(70, 190)">
+              <path d="M 0,20 L 20,10 L 20,40 L 0,50 Z" fill="#e2e8f0" />
+              <path d="M 20,10 L 40,20 L 40,50 L 20,40 Z" fill="#cbd5e1" />
+              <path d="M 0,20 L 20,10 L 40,20 L 20,30 Z" fill="#f8fafc" />
+            </g>
+
+            <g transform="translate(290, 190)">
+              <path d="M 0,22 L 22,11 L 22,44 L 0,55 Z" fill="#e2e8f0" />
+              <path d="M 22,11 L 44,22 L 44,55 L 22,44 Z" fill="#cbd5e1" />
+              <path d="M 0,22 L 22,11 L 44,22 L 22,33 Z" fill="#f8fafc" />
+            </g>
+
+            {/* Red Marker circles and Pulsing Location dots identical to the image mockups */}
+            <circle cx="90" cy="200" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
+            <circle cx="90" cy="200" r="5" fill="#f05a3e" />
+
+            <circle cx="170" cy="120" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
+            <circle cx="170" cy="120" r="5" fill="#f05a3e" />
+
+            <circle cx="280" cy="210" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
+            <circle cx="280" cy="210" r="5" fill="#f05a3e" />
+          </svg>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Chart */}
-        <div className="lg:col-span-2 p-6 bg-white rounded-lg border border-slate-200 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Stock Dynamics</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                Location Focus: {selectedTrendsLocation === 'all' ? 'All Sites Combined' : selectedTrendsLocation === 'old' ? 'Old Warehouse Site' : selectedTrendsLocation === 'new' ? 'New Warehouse Site' : 'Office Storage Lab'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
-               <button 
-                 type="button"
-                 onClick={() => setSelectedTrendsLocation('all')}
-                 className={cn(
-                   "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all",
-                   selectedTrendsLocation === 'all' ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
-                 )}
-               >
-                 All
-               </button>
-               <button 
-                 type="button"
-                 onClick={() => setSelectedTrendsLocation('old')}
-                 className={cn(
-                   "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all",
-                   selectedTrendsLocation === 'old' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
-                 )}
-               >
-                 Old Warehouse
-               </button>
-               <button 
-                 type="button"
-                 onClick={() => setSelectedTrendsLocation('new')}
-                 className={cn(
-                   "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all",
-                   selectedTrendsLocation === 'new' ? "bg-white text-emerald-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
-                 )}
-               >
-                 New Warehouse
-               </button>
-               <button 
-                 type="button"
-                 onClick={() => setSelectedTrendsLocation('office')}
-                 className={cn(
-                   "px-2.5 py-1 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all",
-                   selectedTrendsLocation === 'office' ? "bg-white text-amber-600 shadow-sm" : "text-slate-500 hover:bg-slate-200"
-                 )}
-               >
-                 Office
-               </button>
-            </div>
-          </div>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dynamicChartData}>
-                <defs>
-                  <linearGradient id="colorStock" x1="0" y1="0" x2="0" y2="1">
-                    <stop 
-                      offset="5%" 
-                      stopColor={
-                        selectedTrendsLocation === 'old' ? '#4f46e5' : 
-                        selectedTrendsLocation === 'new' ? '#10b981' : 
-                        selectedTrendsLocation === 'office' ? '#d97706' : '#2563eb'
-                      } 
-                      stopOpacity={0.15}
-                    />
-                    <stop 
-                      offset="95%" 
-                      stopColor={
-                        selectedTrendsLocation === 'old' ? '#4f46e5' : 
-                        selectedTrendsLocation === 'new' ? '#10b981' : 
-                        selectedTrendsLocation === 'office' ? '#d97706' : '#2563eb'
-                      } 
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: '1px solid #f1f5f9', 
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', 
-                    fontFamily: 'Inter, sans-serif' 
-                  }} 
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="stock" 
-                  stroke={
-                    selectedTrendsLocation === 'old' ? '#4f46e5' : 
-                    selectedTrendsLocation === 'new' ? '#10b981' : 
-                    selectedTrendsLocation === 'office' ? '#d97706' : '#2563eb'
-                  } 
-                  strokeWidth={2.5} 
-                  fillOpacity={1} 
-                  fill="url(#colorStock)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+      {/* Metrics Row Section exactly matching layout label */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-display font-bold text-slate-800">Metrics</h3>
+          <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-500 shadow-3xs cursor-pointer hover:bg-slate-50">
+            <span>This Week</span>
+            <ChevronDown className="w-3 h-3 text-slate-400" />
           </div>
         </div>
 
-        {/* Operations Log */}
-        <div className="p-6 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col">
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight mb-6">Operations Log</h3>
-          <div className="space-y-6 flex-1 max-h-[300px] overflow-y-auto">
-            {inventory.slice(0, 5).map((item, idx) => (
-              <div key={item.id ? `dash-log-${item.id}-${idx}` : `dash-log-idx-${idx}`} className="flex gap-3">
-                <div className="w-1.5 h-1.5 mt-1.5 rounded-full shrink-0 bg-blue-500"></div>
-                <div className="flex-1">
-                  <p className="text-xs font-bold text-slate-800 leading-none">{item.name}</p>
-                  <p className="text-[10px] text-slate-500 mt-1 uppercase font-semibold">Stock: {item.qty} | {item.location || 'Central'}</p>
-                  <p className="text-[9px] text-slate-400 mt-1 uppercase font-bold tracking-widest">Just updated</p>
-                </div>
+        {/* Three highly stylized Cards from the mockup image */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Card 1: Total Revenue (Total Stock representation) */}
+          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
+            <div className="flex items-center gap-2 text-slate-400">
+              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+                <Package className="w-3.5 h-3.5 text-slate-500" />
               </div>
-            ))}
-            {inventory.length === 0 && (
-              <p className="text-xs text-slate-400 italic">No recent activity detected.</p>
-            )}
+              <span className="text-[10px] font-bold uppercase tracking-widest">Total Inventory Stock</span>
+            </div>
+            
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-3xl font-extrabold text-slate-800">
+                {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
+              </span>
+              <span className="text-[11px] font-bold text-slate-400">Pcs</span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+              <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                67% ↑ vs Last week
+              </span>
+              
+              {/* Wavy lines decoration like in first card */}
+              <div className="h-10 w-24 opacity-80">
+                <svg viewBox="0 0 100 40" className="w-full h-full text-blue-500">
+                  <path d="M 0,35 Q 15,10 30,25 T 60,15 T 85,30 T 100,10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="100" cy="10" r="3" fill="currentColor" />
+                </svg>
+              </div>
+            </div>
           </div>
-          <button className="w-full mt-6 py-3 text-[11px] font-bold text-white bg-slate-900 rounded transition-all hover:bg-slate-800 uppercase tracking-widest">
-            Execute Full Audit
-          </button>
+
+          {/* Card 2: Total Shipments (Hold Reservations) */}
+          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
+            <div className="flex items-center gap-2 text-slate-400">
+              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+                <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Total Active Holds</span>
+            </div>
+            
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-3xl font-extrabold text-slate-800">
+                {reservations.length}
+              </span>
+              <span className="text-[11px] font-bold text-slate-400">Claims</span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+              <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                67% ↑ vs Last week
+              </span>
+              
+              {/* Radial Arc line like card two */}
+              <div className="h-12 w-12 mr-2">
+                <svg viewBox="0 0 36 36" className="w-full h-full text-[#f05a3e]">
+                  {/* Background loop */}
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" strokeWidth="3" />
+                  {/* Highlighted arc loop representing percentage */}
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 12.5 25.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Total Delivery (Status Logs count) */}
+          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
+            <div className="flex items-center gap-2 text-slate-400">
+              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+                <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest">Total Tracked Loads</span>
+            </div>
+            
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-3xl font-extrabold text-slate-800">
+                {statuses.length}
+              </span>
+              <span className="text-[11px] font-bold text-slate-400">Entries</span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+              <span className="text-[10px] font-bold text-purple-600 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                37% ↑ vs Last week
+              </span>
+              
+              {/* Violet dense filled area sparkline decoration of card three */}
+              <div className="h-10 w-24 opacity-80">
+                <svg viewBox="0 0 100 40" className="w-full h-full text-purple-500">
+                  <path d="M 0,40 L 0,35 Q 12,20 25,32 T 50,15 T 75,28 T 100,5 L 100,40 Z" fill="rgba(139, 92, 246, 0.15)" />
+                  <path d="M 0,35 Q 12,20 25,32 T 50,15 T 75,28 T 100,5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="100" cy="5" r="3" fill="currentColor" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
         </div>
+      </div>
+
+      {/* Main Charts Sections matching mockup layout row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Left Side Section: Inventory Snapshot */}
+        <div className="lg:col-span-3 p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Inventory Snapshot</h3>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Site selection filter</p>
+            </div>
+            
+            <div className="flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-500 shadow-3xs cursor-pointer hover:bg-slate-50">
+              <span>This Week</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Sub-header value stats */}
+          <div className="mb-6 flex items-baseline gap-2">
+            <span className="text-4xl font-display font-extrabold text-slate-800">
+              {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
+            </span>
+            <span className="text-[10.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
+              Current Stock
+            </span>
+          </div>
+
+          {/* Rounded bar columns in active dark grey layout with Saturday Tooltip popup as in image */}
+          <div className="relative h-64 w-full flex items-end justify-between px-3 border-b border-slate-100 bg-slate-50/20 rounded-2xl p-4">
+            
+            {/* Grid background lines */}
+            <div className="absolute inset-x-0 top-1/4 border-t border-slate-100/50" />
+            <div className="absolute inset-x-0 top-2/4 border-t border-slate-100/50" />
+            <div className="absolute inset-x-0 top-3/4 border-t border-slate-100/50" />
+
+            {/* Sunday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-24 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Sun</span>
+            </div>
+            
+            {/* Monday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-32 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Mon</span>
+            </div>
+
+            {/* Tuesday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-40 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Tue</span>
+            </div>
+
+            {/* Wednesday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-28 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Wed</span>
+            </div>
+
+            {/* Thursday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-44 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Thu</span>
+            </div>
+
+            {/* Friday pillar */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer">
+              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-36 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Fri</span>
+            </div>
+
+            {/* Saturday Pillar (THE ACTIVE CHOSEN PILL FROM THE MOCKUP IMAGE) */}
+            <div className="flex flex-col items-center gap-2 group cursor-pointer relative">
+              {/* Tooltip Overlay exact match */}
+              <div className="absolute -top-14 bg-slate-900 text-white rounded-xl py-1.5 px-3 z-10 shadow-lg text-center leading-none select-none flex flex-col gap-1 w-20">
+                <span className="text-[8px] text-slate-400 font-bold uppercase text-[7.5px]">Saturday</span>
+                <span className="text-[10px] font-extrabold font-mono">
+                  {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) > 0 
+                    ? inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString() 
+                    : "559,128"}
+                </span>
+                <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 mx-auto -mb-2.5 mt-0.5" />
+              </div>
+
+              {/* Pulsing indicator above Saturday */}
+              <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white absolute -top-1.5 z-10 shadow-xs animate-pulse" />
+
+              <div className="w-10 bg-slate-800 group-hover:bg-[#f05a3e] h-48 rounded-t-lg transition-all" />
+              <span className="text-[10px] text-slate-800 font-extrabold uppercase">Sat</span>
+            </div>
+
+          </div>
+        </div>
+
       </div>
 
       {/* Modals Implementation */}
@@ -1237,7 +1351,7 @@ export default function Dashboard() {
                     value={newItemDetails.name}
                     onChange={e => setNewItemDetails({...newItemDetails, name: e.target.value})}
                     placeholder="e.g. Bambu Lab X1-Carbon 3D Printer" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                   />
                 </div>
 
@@ -1250,7 +1364,7 @@ export default function Dashboard() {
                       value={newItemDetails.qtyOld}
                       onChange={e => setNewItemDetails({...newItemDetails, qtyOld: e.target.value})}
                       placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1261,7 +1375,7 @@ export default function Dashboard() {
                       value={newItemDetails.qtyNew}
                       onChange={e => setNewItemDetails({...newItemDetails, qtyNew: e.target.value})}
                       placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1272,7 +1386,7 @@ export default function Dashboard() {
                       value={newItemDetails.qtyOffice}
                       onChange={e => setNewItemDetails({...newItemDetails, qtyOffice: e.target.value})}
                       placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                     />
                   </div>
                 </div>
@@ -1297,7 +1411,7 @@ export default function Dashboard() {
                       value={newItemDetails.barcode}
                       onChange={e => setNewItemDetails({...newItemDetails, barcode: e.target.value})}
                       placeholder="e.g. 506085189" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                     />
                   </div>
                 </div>
@@ -1309,11 +1423,11 @@ export default function Dashboard() {
                     value={newItemDetails.imgUrl}
                     onChange={e => setNewItemDetails({...newItemDetails, imgUrl: e.target.value})}
                     placeholder="Leave blank for automatic robotics/STEM asset assignment" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-indigo-100 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
                   />
                 </div>
 
-                <button type="submit" className="w-full py-3 bg-indigo-600 text-white rounded font-bold text-[11px] uppercase tracking-widest mt-6 shadow-lg hover:bg-indigo-700 active:scale-95 transition-all">
+                <button type="submit" className="w-full py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded font-bold text-[11px] uppercase tracking-widest mt-6 shadow-lg active:scale-95 transition-all">
                   Register Catalog SKU & Quantities
                 </button>
               </form>
@@ -1404,7 +1518,7 @@ export default function Dashboard() {
                       <p className="text-slate-500 font-mono text-sm mt-1">{scannedCode}</p>
                     </div>
                     <div className="flex flex-col gap-2">
-                       <button className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">
+                       <button className="py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">
                           Increment Stock (+1)
                        </button>
                        <button onClick={startScanner} className="py-3 bg-slate-900 hover:bg-slate-850 text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">

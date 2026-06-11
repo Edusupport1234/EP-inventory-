@@ -181,7 +181,7 @@ export default function Settings() {
           <button 
             type="button"
             onClick={handleSave}
-            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[11px] uppercase tracking-wider transition-all shadow-md active:scale-95"
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#f05a3e] hover:bg-[#d44327] text-white font-extrabold text-[11px] uppercase tracking-wider transition-all shadow-md active:scale-95"
           >
             <Save className="w-4 h-4" />
             <span>Save Settings</span>
@@ -198,11 +198,11 @@ export default function Settings() {
             onClick={() => setActiveTab('inventory')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'inventory' 
-                ? 'bg-blue-50/70 text-blue-700 border-l-4 border-blue-600' 
+                ? 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]' 
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Package className={`w-4 h-4 ${activeTab === 'inventory' ? 'text-blue-600' : 'text-slate-400'}`} />
+            <Package className={`w-4 h-4 ${activeTab === 'inventory' ? 'text-[#f05a3e]' : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">2. Inventory Catalog</p>
               <p className="text-[9px] text-slate-400 font-medium">Quantities, goals & barcode alerts</p>
@@ -213,11 +213,11 @@ export default function Settings() {
             onClick={() => setActiveTab('locations')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'locations' 
-                ? 'bg-blue-50/70 text-blue-700 border-l-4 border-blue-600' 
+                ? 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]' 
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <MapPin className={`w-4 h-4 ${activeTab === 'locations' ? 'text-blue-600' : 'text-slate-400'}`} />
+            <MapPin className={`w-4 h-4 ${activeTab === 'locations' ? 'text-[#f05a3e]' : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">3. Location Matrix</p>
               <p className="text-[9px] text-slate-400 font-medium">3D rack grid & structure defaults</p>
@@ -228,11 +228,11 @@ export default function Settings() {
             onClick={() => setActiveTab('status')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'status' 
-                ? 'bg-blue-50/70 text-blue-700 border-l-4 border-blue-600' 
+                ? 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]' 
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <ClipboardList className={`w-4 h-4 ${activeTab === 'status' ? 'text-blue-600' : 'text-slate-400'}`} />
+            <ClipboardList className={`w-4 h-4 ${activeTab === 'status' ? 'text-[#f05a3e]' : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">4. Status Tracker</p>
               <p className="text-[9px] text-slate-400 font-medium">Loans, rental audits & reservations</p>
@@ -243,11 +243,11 @@ export default function Settings() {
             onClick={() => setActiveTab('general')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'general' 
-                ? 'bg-blue-50/70 text-blue-700 border-l-4 border-blue-600' 
+                ? 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]' 
                 : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Globe className={`w-4 h-4 ${activeTab === 'general' ? 'text-blue-600' : 'text-slate-400'}`} />
+            <Globe className={`w-4 h-4 ${activeTab === 'general' ? 'text-[#f05a3e]' : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">System & Auth</p>
               <p className="text-[9px] text-slate-400 font-medium">Database state & profile stats</p>
@@ -310,7 +310,7 @@ export default function Settings() {
                       type="checkbox" 
                       checked={allowNegativeQty}
                       onChange={e => setAllowNegativeQty(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-250 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -330,12 +330,12 @@ export default function Settings() {
                       type="checkbox" 
                       checked={autoBarcodeRequired}
                       onChange={e => setAutoBarcodeRequired(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-250 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
                     />
                   </div>
                   <div>
                     <label htmlFor="autoBarcodeRequired" className="text-xs font-extrabold text-slate-800 cursor-pointer flex items-center gap-1.5 uppercase">
-                      <TrendingDown className="w-3.5 h-3.5 text-blue-500" />
+                      <TrendingDown className="w-3.5 h-3.5 text-[#f05a3e]" />
                       <span>Require Sku Barcode Enforcements</span>
                     </label>
                     <p className="text-[10.5px] text-slate-450 leading-normal mt-1">Prevents addition of new items to catalog without establishing a unique barcode/SKU key descriptor.</p>
@@ -417,7 +417,7 @@ export default function Settings() {
                       type="checkbox" 
                       checked={showZoneHighlights}
                       onChange={e => setShowZoneHighlights(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-250 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -487,7 +487,7 @@ export default function Settings() {
                       type="checkbox" 
                       checked={autoRestockOnDelete}
                       onChange={e => setAutoRestockOnDelete(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-250 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -507,7 +507,7 @@ export default function Settings() {
                       type="checkbox" 
                       checked={restrictToCatalog}
                       onChange={e => setRestrictToCatalog(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-slate-250 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
                     />
                   </div>
                   <div>

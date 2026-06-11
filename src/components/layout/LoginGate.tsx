@@ -30,9 +30,9 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
 
     try {
       // 1. Check root credential fallback bootstrap
-      if ((trimmedUser === 'epadmin' || trimmedUser === 'admin') && trimmedPass === '123456') {
+      if ((trimmedUser === 'epedu' || trimmedUser === 'admin') && trimmedPass === '123456') {
         localStorage.setItem('epedu_auth', 'true');
-        localStorage.setItem('epedu_username', 'EPADMIN');
+        localStorage.setItem('epedu_username', 'EPEDU');
         localStorage.setItem('epedu_role', 'super_admin');
         onLoginSuccess();
         return;
@@ -68,8 +68,8 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       {/* Decorative subtle ambient background shapes */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-blue-100/40 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-violet-100/40 blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-orange-100/40 blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-orange-100/30 blur-3xl" />
       </div>
 
       <motion.div
@@ -79,11 +79,11 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
       >
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mb-4 animate-bounce-short">
+          <div className="w-12 h-12 bg-[#f05a3e] rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4 animate-bounce-short">
             <div className="w-5 h-5 border-[3px] border-white rotate-45" />
           </div>
           <h2 className="text-xl font-bold font-sans tracking-tight text-slate-800">
-            EP <span className="text-blue-600">INVENTORY</span>
+            EP <span className="text-[#f05a3e]">INVENTORY</span>
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest">
             Cloud Warehouse Terminal
@@ -118,7 +118,7 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-[#f05a3e] focus:ring-1 focus:ring-[#f05a3e] text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -138,7 +138,7 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter key passcode"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-[#f05a3e] focus:ring-1 focus:ring-[#f05a3e] text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
               />
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-blue-400 disabled:to-indigo-400 text-white font-bold text-sm tracking-wide rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3.5 px-4 bg-[#f05a3e] hover:bg-[#d44327] disabled:bg-[#f05a3e]/50 text-white font-bold text-sm tracking-wide rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
           >
             {isLoading ? (
               <>

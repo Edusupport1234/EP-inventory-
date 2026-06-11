@@ -73,7 +73,7 @@ export default function History() {
   const getLocationBadgeStyle = (location: string) => {
     const loc = (location || '').toLowerCase();
     if (loc.includes('old')) {
-      return 'bg-blue-50 text-blue-700 border-blue-100';
+      return 'bg-orange-50 text-orange-700 border-orange-100';
     } else if (loc.includes('new')) {
       return 'bg-emerald-50 text-emerald-700 border-emerald-100';
     } else if (loc.includes('office')) {
@@ -87,7 +87,7 @@ export default function History() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            <HistoryIcon className="w-5 h-5 text-blue-600 shrink-0" />
+            <HistoryIcon className="w-5 h-5 text-[#f05a3e] shrink-0" />
             Audit Ledger Hub
           </h1>
           <p className="text-slate-500 text-[10.5px] uppercase tracking-wider font-extrabold mt-1">
@@ -97,7 +97,7 @@ export default function History() {
         <div className="flex items-center gap-2">
            <div className="flex -space-x-1.5">
               {[1, 2, 3].map(i => (
-                <div key={i} className="w-6.5 h-6.5 rounded-full border-2 border-white bg-blue-50 text-blue-600 flex items-center justify-center text-[8.5px] font-black uppercase ring-1 ring-slate-100 shadow-3xs">
+                <div key={i} className="w-6.5 h-6.5 rounded-full border-2 border-white bg-orange-50 text-[#f05a3e] flex items-center justify-center text-[8.5px] font-black uppercase ring-1 ring-slate-100 shadow-3xs">
                   U{i}
                 </div>
               ))}
@@ -119,7 +119,7 @@ export default function History() {
             <span className="text-[9.5px] text-slate-400 font-bold uppercase">Actions</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-1 mt-3">
-            <div className="bg-blue-600 h-1 rounded-full" style={{ width: '100%' }}></div>
+            <div className="bg-[#f05a3e] h-1 rounded-full" style={{ width: '100%' }}></div>
           </div>
         </div>
 
@@ -155,7 +155,7 @@ export default function History() {
           <input 
             type="text" 
             placeholder="Search by product, adjuster, reason, location, or team..." 
-            className="w-full bg-slate-50 border border-slate-200 focus:border-blue-500 hover:bg-slate-150 focus:bg-white rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 outline-none transition-all shadow-inner focus:ring-4 focus:ring-blue-50"
+            className="w-full bg-slate-50 border border-slate-200 focus:border-[#f05a3e] hover:bg-slate-150 focus:bg-white rounded-xl py-2.5 pl-10 pr-4 text-xs font-bold text-slate-700 outline-none transition-all shadow-inner focus:ring-4 focus:ring-[#f05a3e]/10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -217,8 +217,8 @@ export default function History() {
                     {/* Product / Reason Details */}
                     <td className="px-6 py-4.5">
                       <div className="flex items-center gap-3.5">
-                        <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200/65 flex items-center justify-center group-hover:bg-blue-50 group-hover:border-blue-200 shrink-0 shadow-3xs transition-all">
-                          <Package className="w-4.5 h-4.5 text-slate-500 group-hover:text-blue-500 transition-colors" />
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200/65 flex items-center justify-center group-hover:bg-orange-50 group-hover:border-orange-200 shrink-0 shadow-3xs transition-all">
+                          <Package className="w-4.5 h-4.5 text-slate-500 group-hover:text-[#f05a3e] transition-colors" />
                         </div>
                         <div className="min-w-0">
                           <span className="text-[12.5px] font-extrabold text-slate-800 uppercase block tracking-tight truncate">{log.item}</span>
@@ -244,11 +244,11 @@ export default function History() {
                     {/* Adjusted operator */}
                     <td className="px-6 py-4.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-slate-150 group-hover:bg-blue-150 border border-slate-200/60 flex items-center justify-center transition-colors">
-                          <User className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+                        <div className="w-7 h-7 rounded-full bg-slate-150 group-hover:bg-orange-100 border border-slate-200/60 flex items-center justify-center transition-colors">
+                          <User className="w-3.5 h-3.5 text-slate-500 group-hover:text-[#f05a3e] transition-colors" />
                         </div>
                         <div className="flex flex-col">
-                          <p className="text-[11px] font-bold text-slate-700 leading-none transition-colors group-hover:text-blue-600">{log.actor || 'N/A'}</p>
+                          <p className="text-[11px] font-bold text-slate-700 leading-none transition-colors group-hover:text-[#f05a3e]">{log.actor || 'N/A'}</p>
                           {(log.takenBy && log.takenBy !== log.actor) && (
                             <span className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider mt-1">Recipient: {log.takenBy}</span>
                           )}

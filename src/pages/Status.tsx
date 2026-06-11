@@ -762,7 +762,7 @@ export default function Status() {
         </div>
         <button 
           onClick={openNewModal}
-          className="bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-[11px] uppercase tracking-wider px-5 py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
+          className="bg-[#f05a3e] hover:bg-[#d44327] text-white font-extrabold text-[11px] uppercase tracking-wider px-5 py-3 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>New Record</span>
@@ -818,13 +818,13 @@ export default function Status() {
                   onClick={() => setSelectedTypeFilter(tab.id as any)}
                   className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-[11px] uppercase tracking-wider transition-all duration-200 active:scale-95 border ${
                     isActive 
-                      ? 'bg-teal-600 border-teal-600 text-white shadow-sm' 
+                      ? 'bg-[#f05a3e] border-[#f05a3e] text-white shadow-sm' 
                       : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
-                    isActive ? 'bg-teal-700/60 text-teal-50' : 'bg-slate-100 text-slate-500'
+                    isActive ? 'bg-[#d44327]/60 text-white' : 'bg-slate-100 text-slate-500'
                   }`}>
                     {count}
                   </span>
@@ -864,7 +864,7 @@ export default function Status() {
                         }`}>
                           {record.status}
                         </span>
-                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                        <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-100">
                           {record.where || 'Client'}
                         </span>
                       </div>
@@ -913,7 +913,7 @@ export default function Status() {
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => openEditModal(record)}
-                        className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all active:scale-95 text-xs font-bold shrink-0"
+                        className="p-2 border border-slate-200 rounded-lg text-slate-500 hover:text-[#f05a3e] hover:bg-orange-50 hover:border-orange-200 transition-all active:scale-95 text-xs font-bold shrink-0"
                         title="Edit Status"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -1016,9 +1016,9 @@ export default function Status() {
                           {reservedQty}
                         </span>
                       </div>
-                      <div className="bg-indigo-50/40 p-1.5 rounded-lg border border-indigo-100/50">
+                      <div className="bg-orange-50/40 p-1.5 rounded-lg border border-orange-100/50">
                         <span className="text-[7.5px] font-black text-slate-400 uppercase tracking-wider block">Total Stock</span>
-                        <span className="text-xs font-black text-indigo-950 font-mono">{totalOnHand}</span>
+                        <span className="text-xs font-black text-[#f05a3e] font-mono">{totalOnHand}</span>
                       </div>
                     </div>
                   </div>
@@ -1073,7 +1073,7 @@ export default function Status() {
                     placeholder="e.g., ORDER 543" 
                     value={order}
                     onChange={(e) => setOrder(e.target.value)}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all"
                   />
                 </div>
                 <div>
@@ -1089,7 +1089,7 @@ export default function Status() {
                         setItem(val);
                       }
                     }}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all mb-2 shadow-sm"
+                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all mb-2 shadow-sm"
                   >
                     <option value="">-- Choose Synced Firebase Product --</option>
                     {products.map((p, idx) => (
@@ -1108,7 +1108,7 @@ export default function Status() {
                       placeholder="Type custom item name..." 
                       value={item}
                       onChange={(e) => setItem(e.target.value)}
-                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all animate-in slide-in-from-top-1 duration-150"
+                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all animate-in slide-in-from-top-1 duration-150"
                     />
                   )}
                 </div>
@@ -1122,7 +1122,7 @@ export default function Status() {
                     step="1"
                     value={qty}
                     onChange={(e) => setQty(e.target.value)}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all"
                   />
                 </div>
 
@@ -1133,7 +1133,7 @@ export default function Status() {
                       id="st-type"
                       value={statusType}
                       onChange={(e) => setStatusType(e.target.value as 'Loan' | 'Rent' | 'Reserve')}
-                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all"
                     >
                       <option value="Loan">Loan</option>
                       <option value="Rent">Rent</option>
@@ -1147,7 +1147,7 @@ export default function Status() {
                       id="st-where"
                       value={where}
                       onChange={(e) => setWhere(e.target.value)}
-                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-teal-500 transition-all"
+                      className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-[#f05a3e] transition-all"
                     >
                       <option value="Client">Client</option>
                       <option value="On the way back">On the way back</option>
@@ -1166,7 +1166,7 @@ export default function Status() {
                     placeholder="Optional notes..." 
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:bg-white focus:border-teal-500 transition-all resize-none"
+                    className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:bg-white focus:border-[#f05a3e] transition-all resize-none"
                   />
                 </div>
 
@@ -1180,7 +1180,7 @@ export default function Status() {
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white border border-teal-600 rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all text-center"
+                    className="flex-1 py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white border border-[#f05a3e] rounded-xl text-xs font-bold uppercase tracking-wider active:scale-95 transition-all text-center"
                   >
                     Save Record
                   </button>

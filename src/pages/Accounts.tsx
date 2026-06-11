@@ -58,14 +58,18 @@ export default function Accounts() {
       });
 
       // If the bootstrap admin account isn't initialized yet inside firestore, list it virtual or auto-inject
-      if (!uList.some(u => u.username.toLowerCase() === 'epadmin' || u.id.toLowerCase() === 'epadmin')) {
-        uList.unshift({
-          id: 'EPADMIN',
-          username: 'EPADMIN',
-          password: '123456',
-          role: 'super_admin',
-          lastActive: new Date().toISOString(),
-        });
+      if (!uList.some(u => u.username.toLowerCase() === 'epedu' || u.id.toLowerCase() === 'epedu')) {
+        // Only inject virtually if there are no other accounts in the database.
+        // Once another account is created, the system enables deleting EPEDU permanently.
+        if (uList.length === 0) {
+          uList.unshift({
+            id: 'epedu',
+            username: 'EPEDU',
+            password: '123456',
+            role: 'super_admin',
+            lastActive: new Date().toISOString(),
+          });
+        }
       }
 
       // Deduplicate to guarantee absolute unique keys by lowercase id and lowercase username
@@ -183,9 +187,9 @@ export default function Accounts() {
     // If username is changing, ensure it's not a duplicate
     const oldUsernameLower = selectedUser.username.toLowerCase();
     
-    // Protect EPADMIN username from being changed online
-    if (oldUsernameLower === 'epadmin' && checkUser !== 'epadmin') {
-      setChangePassError("The root security account username 'EPADMIN' is system-protected and cannot be changed.");
+    // Protect EPEDU username from being changed online
+    if (oldUsernameLower === 'epedu' && checkUser !== 'epedu') {
+      setChangePassError("The root security account username 'EPEDU' is system-protected and cannot be changed.");
       return;
     }
 
@@ -211,8 +215,8 @@ export default function Accounts() {
           lastActive: selectedUser.lastActive || '',
         });
 
-        // Delete the old document if it wasn't the virtual EPADMIN
-        if (selectedUser.id !== 'EPADMIN') {
+        // Delete the old document if it wasn't the virtual EPEDU
+        if (selectedUser.id.toLowerCase() !== 'epedu') {
           const oldRef = doc(db, 'userAccounts', selectedUser.id);
           await deleteDoc(oldRef);
         }
@@ -220,10 +224,10 @@ export default function Accounts() {
         triggerToast(`Account details for "${updatedUsername}" updated!`);
       } else {
         // Just update existing document
-        const docId = selectedUser.id === 'EPADMIN' ? 'epadmin' : selectedUser.id;
+        const docId = selectedUser.id.toLowerCase() === 'epedu' ? 'epedu' : selectedUser.id;
         const userRef = doc(db, 'userAccounts', docId);
         await setDoc(userRef, {
-          username: selectedUser.id === 'EPADMIN' ? 'EPADMIN' : updatedUsername.trim(),
+          username: selectedUser.id.toLowerCase() === 'epedu' ? 'EPEDU' : updatedUsername.trim(),
           password: checkPass,
           role: targetRole,
           lastActive: selectedUser.lastActive || '',
@@ -242,8 +246,8 @@ export default function Accounts() {
 
   // Delete dynamic user account
   const handleDeleteAccount = async (idToDelete: string, usernameToDelete: string) => {
-    if (usernameToDelete.toLowerCase() === 'epadmin' || idToDelete.toLowerCase() === 'epadmin') {
-      triggerToast("The primary bootstrap security admin account EPADMIN cannot be deleted.");
+    if ((usernameToDelete.toLowerCase() === 'epedu' || idToDelete.toLowerCase() === 'epedu') && accounts.length <= 1) {
+      triggerToast("The primary emergency admin account EPEDU cannot be deleted when no other user accounts exist.");
       return;
     }
 
@@ -421,14 +425,14 @@ export default function Accounts() {
       {/* Audit Stats Bento */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs relative overflow-hidden flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+          <div className="p-3 rounded-xl bg-orange-50 text-[#f05a3e]">
             <Users className="w-6 h-6" />
           </div>
           <div>
             <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Total Registered Accounts</p>
             <p className="text-2xl font-black text-slate-800 tracking-tight mt-0.5">{totalUsersCount}</p>
           </div>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50/20 rounded-full translate-x-8 -translate-y-8" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full translate-x-8 -translate-y-8" />
         </div>
 
         <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs relative overflow-hidden flex items-center gap-4">
@@ -445,16 +449,16 @@ export default function Accounts() {
         </div>
 
         <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs relative overflow-hidden flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600">
+          <div className="p-3 rounded-xl bg-orange-50 text-[#f05a3e]">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
             <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">System Authorization</p>
-            <p className="text-xs font-black text-indigo-700 tracking-tight mt-1 uppercase bg-indigo-50/50 border border-indigo-100 rounded px-2 py-0.5 inline-block">
+            <p className="text-xs font-black text-orange-700 tracking-tight mt-1 uppercase bg-orange-50/50 border border-orange-100 rounded px-2 py-0.5 inline-block">
               Authoritative Sync: OK
             </p>
           </div>
-          <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/20 rounded-full translate-x-8 -translate-y-8" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full translate-x-8 -translate-y-8" />
         </div>
       </div>
 
@@ -480,7 +484,7 @@ export default function Accounts() {
                 placeholder="Search user or role..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-500 transition-all font-sans"
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] transition-all font-sans"
               />
             </div>
           </div>
@@ -527,7 +531,7 @@ export default function Accounts() {
                               Viewer (Read-Only)
                             </span>
                           ) : (
-                            <span className="text-[9px] font-black tracking-widest text-blue-700 bg-blue-50 border border-blue-100 uppercase rounded-sm px-1.5 py-0.5">
+                            <span className="text-[9px] font-black tracking-widest text-[#f05a3e] bg-orange-50 border border-orange-100 uppercase rounded-sm px-1.5 py-0.5">
                               Warehouse User
                             </span>
                           )}
@@ -561,7 +565,7 @@ export default function Accounts() {
                           <button
                             type="button"
                             onClick={() => handleDeleteAccount(user.id, user.username)}
-                            disabled={user.username.toLowerCase() === 'epadmin' || user.id.toLowerCase() === 'epadmin'}
+                            disabled={(user.username.toLowerCase() === 'epedu' || user.id.toLowerCase() === 'epedu') && accounts.length <= 1}
                             className="text-xs font-extrabold text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-30 disabled:hover:bg-rose-50 rounded-lg p-1.5 transition-all outline-none cursor-pointer"
                             title="Delete Account"
                           >
@@ -604,7 +608,7 @@ export default function Accounts() {
                   value={newUsername}
                   onChange={e => setNewUsername(e.target.value)}
                   placeholder="e.g. auditor_john"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] font-mono"
                 />
               </div>
 
@@ -615,7 +619,7 @@ export default function Accounts() {
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   placeholder="Enter login password"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 font-mono"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] font-mono"
                 />
               </div>
 
@@ -624,7 +628,7 @@ export default function Accounts() {
                 <select 
                   value={newRole}
                   onChange={e => setNewRole(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 bg-white"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] bg-white"
                 >
                   <option value="user">Auditor User (Standard Staff)</option>
                   <option value="viewer">Viewer (Read-Only Access)</option>
@@ -634,7 +638,7 @@ export default function Accounts() {
 
               <button 
                 type="submit"
-                className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
+                className="w-full py-2.5 px-4 bg-[#f05a3e] hover:bg-[#d44327] text-white font-extrabold text-[11px] uppercase tracking-wider rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
               >
                 Create Account Key
               </button>
@@ -678,7 +682,7 @@ export default function Accounts() {
                   </div>
                 )}
 
-                <form onSubmit={handleUpdateAccountDetails} className="space-y-4">
+                 <form onSubmit={handleUpdateAccountDetails} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black uppercase text-slate-500 block">Edit Username</label>
                     <input 
@@ -687,7 +691,7 @@ export default function Accounts() {
                       onChange={e => setUpdatedUsername(e.target.value)}
                       disabled={selectedUser.username.toLowerCase() === 'epadmin'}
                       placeholder="Username"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 disabled:opacity-60 disabled:bg-slate-100 font-mono"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] disabled:opacity-60 disabled:bg-slate-100 font-mono"
                     />
                     {selectedUser.username.toLowerCase() === 'epadmin' && (
                       <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">The bootstrap Admin username is system-protected.</p>
@@ -701,7 +705,7 @@ export default function Accounts() {
                       value={updatedPassword}
                       onChange={e => setUpdatedPassword(e.target.value)}
                       placeholder="Enter new password"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 font-mono"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] font-mono"
                     />
                   </div>
 
@@ -710,7 +714,7 @@ export default function Accounts() {
                     <select 
                       value={updatedRole}
                       onChange={e => setUpdatedRole(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-blue-500 bg-white"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-[#f05a3e] bg-white"
                     >
                       <option value="user">Auditor User (Standard Staff)</option>
                       <option value="viewer">Viewer (Read-Only Access)</option>

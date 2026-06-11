@@ -1,26 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --color-brand-primary: #3b82f6;
-  --color-brand-secondary: #1d4ed8;
-  --color-surface: #f8fafc;
+  --font-display: "Outfit", sans-serif;
+  --color-brand-primary: #f05a3e; /* Coral Accent */
+  --color-brand-secondary: #d44327;
+  --color-surface-bg: #f4f5f7; /* Soft grey bg */
 }
 
 @layer base {
   body {
-    @apply font-sans bg-slate-50 text-slate-800;
+    @apply font-sans bg-[#f4f5f7] text-slate-800 antialiased;
   }
 }
 
 @layer components {
   .card-polished {
-    @apply bg-white border border-slate-200 rounded-lg shadow-sm;
+    @apply bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300;
   }
   
   .btn-primary {
-    @apply bg-blue-600 text-white font-bold py-2 px-4 rounded transition-all hover:bg-blue-700 active:scale-95;
+    @apply bg-[#f05a3e] text-white font-bold py-2.5 px-5 rounded-full transition-all hover:bg-[#d44327] active:scale-95 shadow-[0_4px_14px_rgba(240,90,62,0.25)];
   }
 
   .grid-line {
@@ -35,12 +36,12 @@
 }
 
 @keyframes slide-up {
-  from { transform: translateY(10px); opacity: 0; }
+  from { transform: translateY(12px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
 .animate-in {
-  animation-duration: 0.5s;
+  animation-duration: 0.4s;
   animation-fill-mode: both;
 }
 
