@@ -22,6 +22,18 @@ import { getDoc, updateDoc } from 'firebase/firestore';
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('epedu_theme') as 'light' | 'dark') || 'light';
+  });
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('epedu_theme', next);
+      return next;
+    });
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('epedu_auth') === 'true';
   });
@@ -116,13 +128,18 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] flex text-slate-900 font-sans">
+    <div className={`min-h-screen flex font-sans transition-colors duration-300 ${
+      theme === 'dark' 
+        ? 'bg-[#111215] text-[#e3e5e8] dark' 
+        : 'bg-[#f8f7f4] text-slate-900'
+    }`}>
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         onLogout={handleLogout}
+        theme={theme}
       />
       
       <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
@@ -134,16 +151,18 @@ export default function App() {
         <Navbar 
           toggleSidebar={toggleSidebar} 
           onLogout={handleLogout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
         
         <main className="flex-1 p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
-          {activeTab === 'dashboard' && <Dashboard />}
-          {activeTab === 'inventory' && <Inventory />}
-          {activeTab === 'locations' && <Locations />}
-          {activeTab === 'status' && <Status />}
-          {activeTab === 'history' && <History />}
-          {activeTab === 'settings' && <Settings />}
-          {activeTab === 'accounts' && <Accounts />}
+          {activeTab === 'dashboard' && <Dashboard theme={theme} />}
+          {activeTab === 'inventory' && <Inventory theme={theme} />}
+          {activeTab === 'locations' && <Locations theme={theme} />}
+          {activeTab === 'status' && <Status theme={theme} />}
+          {activeTab === 'history' && <History theme={theme} />}
+          {activeTab === 'settings' && <Settings theme={theme} />}
+          {activeTab === 'accounts' && <Accounts theme={theme} />}
         </main>
       </div>
 

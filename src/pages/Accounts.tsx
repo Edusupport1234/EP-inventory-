@@ -15,7 +15,7 @@ interface UserAccount {
   lastActive?: string;
 }
 
-export default function Accounts() {
+export default function Accounts({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -316,7 +316,7 @@ export default function Accounts() {
   const onlineUsersCount = accounts.filter(acc => getUserOnlineState(acc).isOnline).length;
 
   return (
-    <div className="min-h-screen bg-slate-50/50 -m-6 p-6 space-y-6 pb-24">
+    <div className="min-h-screen bg-transparent -m-6 p-6 space-y-6 pb-24 text-[var(--neo-text)]">
       {/* Delete Confirmation Modal Overlay */}
       <AnimatePresence>
         {deleteConfirmUser && (

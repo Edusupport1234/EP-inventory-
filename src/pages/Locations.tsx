@@ -1010,7 +1010,7 @@ const WarehouseScene = ({
   );
 };
 
-export default function Locations() {
+export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const [activeTab, setActiveTab] = useState<'3d' | 'labels'>('3d');
   const [visualZones, setVisualZones] = useState<ZoneInfo[]>(PHYSICAL_ZONES);
   const [selectedRack, setSelectedRack] = useState<RackData | null>(null);

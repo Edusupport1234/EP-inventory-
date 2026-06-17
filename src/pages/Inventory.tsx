@@ -30,7 +30,7 @@ function getFallbackImage(name: string): string {
   return 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=500&auto=format&fit=crop&q=80'; // Engineering / STEM General
 }
 
-export default function Inventory() {
+export default function Inventory({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
@@ -655,7 +655,7 @@ export default function Inventory() {
   };
 
   return (
-    <div className="min-h-screen bg-white -m-6 p-6 space-y-6 animate-in fade-in duration-500 pb-24">
+    <div className="min-h-screen bg-transparent -m-6 p-6 space-y-6 animate-in fade-in duration-500 pb-24 text-[var(--neo-text)]">
       
       {/* Target UI Title Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e6decf] pb-4">

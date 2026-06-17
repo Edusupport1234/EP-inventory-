@@ -19,7 +19,7 @@ interface Adjustment {
   adjustedBy?: string;
 }
 
-export default function History() {
+export default function History({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const [logs, setLogs] = useState<Adjustment[]>([]);
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(auth.currentUser);

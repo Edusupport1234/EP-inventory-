@@ -27,7 +27,7 @@ interface StatusRecord {
   updatedAt?: any;
 }
 
-export default function Status() {
+export default function Status({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
   const [search, setSearch] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'All' | 'Loan' | 'Rent' | 'Reserve' | 'Completed'>('All');
   const [statuses, setStatuses] = useState<StatusRecord[]>([]);
@@ -734,7 +734,7 @@ export default function Status() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50/50 -m-6 p-6 space-y-6 pb-24">
+    <div className="min-h-screen bg-transparent -m-6 p-6 space-y-6 pb-24 text-[var(--neo-text)]">
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (

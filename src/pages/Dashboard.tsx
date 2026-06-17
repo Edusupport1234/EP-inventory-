@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Package, TrendingUp, AlertCircle, CheckCircle2, ArrowUpRight, ArrowDownRight, Plus, Scan, Tag, X, ChevronRight, Hash, Sliders, Bookmark, Search, MapPin, ChevronDown, ClipboardList } from 'lucide-react';
+import { Package, TrendingUp, AlertCircle, CheckCircle2, ArrowUpRight, ArrowDownRight, Plus, Scan, Tag, X, ChevronRight, Hash, Sliders, Bookmark, Search, MapPin, ChevronDown, ClipboardList, Image } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { cn } from '@/src/lib/utils';
-import { db, collection, addDoc, onSnapshot, serverTimestamp, updateDoc, doc, arrayUnion, query, orderBy, handleFirestoreError, OperationType, auth, rtdb, ref, onValue, set, update, setDoc } from '@/src/lib/firebase';
+import { db, collection, addDoc, onSnapshot, serverTimestamp, updateDoc, doc, arrayUnion, query, orderBy, handleFirestoreError, OperationType, auth, rtdb, ref, onValue, set, update, setDoc, deleteDoc } from '@/src/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -18,7 +18,8 @@ const defaultChartData = [
   { name: 'Jul', stock: 3490 },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [inventory, setInventory] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
@@ -687,6 +688,71 @@ export default function Dashboard() {
     }
   };
 
+  const handleConfirmReservation = async (record: any) => {
+    try {
+      // 1. Subtract from physical location stock and overall total in Firestore & RTDB
+      const matchingProduct = inventory.find(p => p.name.toLowerCase() === record.item.toLowerCase());
+      if (matchingProduct) {
+        const fieldMap: { [key: string]: string } = { 
+          'Old warehouse': 'qtyOld', 
+          'New warehouse': 'qtyNew', 
+          'Office': 'qtyOffice' 
+        };
+        const field = fieldMap[record.where] || 'qtyOld';
+        const currentLocQty = matchingProduct[field] || 0;
+
+        const newLocQty = Math.max(0, currentLocQty - record.qty);
+        const newTotalQty = Math.max(0, (matchingProduct.qty || 0) - record.qty);
+
+        try {
+          await updateDoc(doc(db, 'inventory', matchingProduct.id), {
+            [field]: newLocQty,
+            qty: newTotalQty
+          });
+          await update(ref(rtdb, `inventory/${matchingProduct.id}`), {
+            [field]: newLocQty,
+            qty: newTotalQty
+          });
+        } catch (err_deduct) {
+          console.warn("Dashboard Confirm Sale: Deducting physical stock failed:", err_deduct);
+        }
+      }
+
+      // 2. Delete the companion reservation from active reservations collection
+      try {
+        await deleteDoc(doc(db, 'reservations', record.id));
+        await set(ref(rtdb, `reservations/${record.id}`), null);
+      } catch (err_res_del) {
+        console.warn("Dashboard Companion reservation deletion failed:", err_res_del);
+      }
+
+      // 3. Update the parent status record to represent a Completed/Finalized sale (deducted)
+      const updatedStatusPayload = {
+        status: 'Completed',
+        remarks: record.remarks ? `${record.remarks} [Confirmed Sale & Stocks Shipped]` : '[Confirmed Sale & Stocks Shipped]',
+        stockDeducted: true,
+        updatedAt: serverTimestamp()
+      };
+
+      const updatedStatusPayloadRtdb = {
+        status: 'Completed',
+        remarks: record.remarks ? `${record.remarks} [Confirmed Sale & Stocks Shipped]` : '[Confirmed Sale & Stocks Shipped]',
+        stockDeducted: true,
+        updatedAt: Date.now()
+      };
+
+      await updateDoc(doc(db, 'statuses', record.id), updatedStatusPayload);
+      try {
+        await update(ref(rtdb, `statuses/${record.id}`), updatedStatusPayloadRtdb);
+      } catch (e) {}
+
+      showToast('Sale Confirmed! Reserved count has returned to zero.');
+    } catch (error) {
+      console.error(error);
+      showToast('Error confirming sale reservation', 'error');
+    }
+  };
+
   const startScanner = async () => {
     setIsScannerOpen(true);
     setScannedCode(null);
@@ -764,25 +830,32 @@ export default function Dashboard() {
   const dynamicChartData = getChartData();
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* Top Header Row with Title and Integrated Search as shown in the image */}
+    <div className={`space-y-6 animate-in fade-in duration-500 pb-12 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+      
+      {/* Top Header Row with Title and Integrated Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">Dashboard</h1>
+          <h1 className={`text-3xl font-display font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            EP <span className={isDark ? "text-[#c5f82a]" : "text-[#f05a3e]"}>Dashboard</span>
+          </h1>
         </div>
         <div id="dashboard-stock-locator" className="flex items-center gap-4 shrink-0 max-w-md w-full sm:w-auto">
           {/* Integrated Header "Search anything" input bar */}
           <div className="relative flex-1 sm:w-72">
             <input
               type="text"
-              placeholder="Search anything"
+              placeholder="Search SKU or name..."
               value={dashboardSearchText}
               onChange={(e) => {
                 setDashboardSearchText(e.target.value);
                 setShowDashboardSearchDropdown(true);
               }}
               onFocus={() => setShowDashboardSearchDropdown(true)}
-              className="w-full bg-white/70 backdrop-blur-md border border-slate-200 focus:border-[#f05a3e] rounded-full py-2.5 pl-10 pr-4 text-xs font-semibold text-slate-800 outline-none shadow-3xs transition-all focus:ring-4 focus:ring-[#f05a3e]/10"
+              className={`w-full rounded-full py-2.5 pl-10 pr-4 text-xs font-semibold outline-none transition-all focus:ring-4 ${
+                isDark 
+                  ? "bg-[#1c1d21] border border-[#25272c] text-white focus:border-[#c5f82a] focus:ring-[#c5f82a]/15" 
+                  : "bg-white border border-slate-200 text-slate-800 focus:border-[#f05a3e] focus:ring-[#f05a3e]/10"
+              }`}
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             
@@ -793,7 +866,9 @@ export default function Dashboard() {
                   className="fixed inset-0 z-40" 
                   onClick={() => setShowDashboardSearchDropdown(false)} 
                 />
-                <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-white border border-[#eef0f3] rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.06)] z-50 p-2.5 space-y-1">
+                <div className={`absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto border rounded-2xl shadow-xl z-50 p-2.5 space-y-1 ${
+                  isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3]"
+                }`}>
                   {inventory.filter(item => 
                     item.name.toLowerCase().includes(dashboardSearchText.toLowerCase())
                   ).length > 0 ? (
@@ -811,20 +886,26 @@ export default function Dashboard() {
                             setSelectedLocateItem(item);
                             setShowDashboardSearchDropdown(false);
                           }}
-                          className="p-2 rounded-xl hover:bg-slate-50 cursor-pointer flex justify-between items-center transition-colors text-xs font-bold text-slate-700"
+                          className={`p-2 rounded-xl cursor-pointer flex justify-between items-center transition-colors text-xs font-bold ${
+                            isDark ? "hover:bg-[#25272c] text-zinc-300" : "hover:bg-slate-50 text-slate-700"
+                          }`}
                         >
                           <div className="truncate">
-                            <p className="font-extrabold text-slate-900 uppercase leading-none truncate">{item.name}</p>
+                            <p className={`font-extrabold uppercase leading-none truncate ${isDark ? "text-white" : "text-slate-900"}`}>{item.name}</p>
                             <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
                               Qty: {item.qty} • {item.location || 'Central'}
                             </p>
                           </div>
                           {shelfLabel ? (
-                            <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded border border-emerald-150 uppercase tracking-widest">
+                            <span className={`text-[8px] font-black px-2 py-1 rounded border uppercase tracking-widest ${
+                              isDark ? "bg-emerald-950/40 text-emerald-400 border-emerald-900/30" : "bg-emerald-50 text-emerald-600 border-emerald-150"
+                            }`}>
                               {shelfLabel}
                             </span>
                           ) : (
-                            <span className="text-[8px] font-black bg-slate-50 text-slate-400 px-2 py-1 rounded border border-slate-100 uppercase tracking-widest">
+                            <span className={`text-[8px] font-black px-2 py-1 rounded border uppercase tracking-widest ${
+                              isDark ? "bg-zinc-800 text-zinc-400 border-zinc-700" : "bg-slate-50 text-slate-400 border-slate-100"
+                            }`}>
                               Unplaced
                             </span>
                           )}
@@ -846,25 +927,33 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-5 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_35px_rgba(0,0,0,0.02)] flex flex-col md:flex-row gap-5 items-center justify-between"
+          className={`p-5 border rounded-[24px] shadow-sm flex flex-col md:flex-row gap-5 items-center justify-between ${
+            isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3]"
+          }`}
         >
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-extrabold shrink-0">
-              <Package className="w-6 h-6 text-emerald-600 animate-pulse" />
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-extrabold shrink-0 ${
+              isDark ? "bg-emerald-950/30 border border-emerald-900/30 text-emerald-400" : "bg-emerald-50 border border-emerald-100 text-emerald-600"
+            }`}>
+              <Package className="w-6 h-6 animate-pulse" />
             </div>
             <div>
-              <p className="text-[9px] font-black tracking-wider uppercase text-emerald-600 mb-0.5">Item Discovered in Database</p>
-              <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-tight leading-none">{selectedLocateItem.name}</h3>
+              <p className={`text-[9px] font-black tracking-wider uppercase mb-0.5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>Item Discovered in Database</p>
+              <h3 className={`text-sm font-extrabold uppercase tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-800'}`}>{selectedLocateItem.name}</h3>
               <p className="text-[11px] font-semibold text-slate-500 mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span>Site Warehouse:</span>
-                <span className="bg-slate-100 px-2.5 py-0.5 rounded-lg text-slate-800 font-bold uppercase text-[9px] border border-slate-200">
+                <span className={isDark ? "text-zinc-400" : "text-slate-500"}>Site Warehouse:</span>
+                <span className={`px-2.5 py-0.5 rounded-lg font-bold uppercase text-[9px] border ${
+                  isDark ? "bg-zinc-800 text-zinc-200 border-zinc-700" : "bg-slate-100 text-slate-800 border-slate-200"
+                }`}>
                   {selectedLocateItem.location || 'Main Warehouse'}
                 </span>
                 {selectedLocateItem.rackId ? (
                   <>
                     <span className="text-slate-400">•</span>
-                    <span>Cabinet Placement:</span>
-                    <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-lg font-black uppercase text-[9px] border border-emerald-250">
+                    <span className={isDark ? "text-zinc-400" : "text-slate-500"}>Cabinet Placement:</span>
+                    <span className={`px-2.5 py-0.5 rounded-lg font-black uppercase text-[9px] border ${
+                      isDark ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50" : "bg-emerald-100 text-emerald-800 border-emerald-250"
+                    }`}>
                       Level {Number(selectedLocateItem.rackLevel) + 1}
                     </span>
                   </>
@@ -886,7 +975,9 @@ export default function Dashboard() {
                   localStorage.setItem('locateStockName', selectedLocateItem.name);
                   window.dispatchEvent(new CustomEvent('change-tab', { detail: 'locations' }));
                 }}
-                className="flex-1 md:flex-initial px-5 py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white text-[10px] font-black uppercase tracking-widest rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                className={`flex-1 md:flex-initial px-5 py-3 font-black text-[10px] uppercase tracking-widest rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isDark ? 'bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-lg' : 'bg-[#f05a3e] hover:bg-[#d44327] text-white'
+                }`}
               >
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Locate In 3D Map 🔍</span>
@@ -898,7 +989,9 @@ export default function Dashboard() {
                 setSelectedLocateItem(null);
                 setDashboardSearchText('');
               }}
-              className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors border border-slate-200"
+              className={`px-5 py-3 text-[10px] font-bold uppercase tracking-wider rounded-full transition-colors border ${
+                isDark ? "bg-[#25272c] hover:bg-[#2c2f35] text-zinc-300 border-zinc-700" : "bg-slate-100 hover:bg-slate-200 text-slate-500 border-slate-200"
+              }`}
             >
               Clear
             </button>
@@ -907,203 +1000,300 @@ export default function Dashboard() {
       )}
 
       {/* Main Hero Card exactly as styled in the image */}
-      <div className="p-8 pb-10 bg-white border border-[#eef0f3] rounded-[32px] shadow-[0_12px_45px_rgba(0,0,0,0.015)] relative overflow-hidden flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8">
+      <div className={`p-8 pb-10 border rounded-[32px] relative overflow-hidden flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 ${
+        isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3] shadow-[0_12px_45px_rgba(0,0,0,0.015)]"
+      }`}>
         <div className="space-y-4 max-w-xl z-10">
-          <p className="text-slate-400 text-xs font-semibold tracking-wide">
-            Welcome Back, <span className="text-slate-800 font-extrabold">{localStorage.getItem('epedu_username') || "Xiofik Hasan"}</span>
+          <p className={isDark ? "text-zinc-400 text-xs font-semibold tracking-wide" : "text-slate-400 text-xs font-semibold tracking-wide"}>
+            Welcome Back, <span className={`font-extrabold ${isDark ? "text-white" : "text-slate-800"}`}>{localStorage.getItem('epedu_username') || "Xiofik Hasan"}</span>
           </p>
-          <h2 className="text-4xl md:text-[50px] leading-[1.1] font-display font-medium text-slate-900 tracking-tight">
+          <h2 className={`text-4xl md:text-[50px] leading-[1.1] font-display font-medium tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
             Inventory System
           </h2>
-          <p className="text-slate-500 text-[13px] leading-relaxed max-w-lg font-medium">
+          <p className={`text-[13px] leading-relaxed max-w-lg font-medium ${isDark ? "text-zinc-350" : "text-slate-500"}`}>
             Track inventory flow, fulfillment speed, and vendor efficiency — all updated in real time for smarter decisions.
           </p>
           <div className="pt-3 flex flex-wrap items-center gap-3">
             <button
               onClick={() => setIsAddItemModalOpen(true)}
-              className="px-6 py-3.5 bg-[#f05a3e] hover:bg-[#d44327] text-white font-extrabold text-[11px] uppercase tracking-wider rounded-full transition-all shadow-[0_6px_20px_rgba(240,90,62,0.25)] active:scale-95 cursor-pointer flex items-center gap-1.5"
+              className={`px-6 py-3.5 font-extrabold text-[11px] uppercase tracking-wider rounded-full transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                isDark ? "bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-lg" : "bg-[#f05a3e] hover:bg-[#d44327] text-white shadow-md shadow-[#f05a3e]/15"
+              }`}
             >
               <Plus className="w-4 h-4 stroke-[2.5px]" />
               <span>Add New Item</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[11px] uppercase tracking-wide rounded-full transition-all active:scale-95 cursor-pointer"
+              className={`px-5 py-3.5 font-black text-[11px] uppercase tracking-wide rounded-full transition-all active:scale-95 cursor-pointer ${
+                isDark ? "bg-zinc-800 hover:bg-zinc-700 text-white" : "bg-slate-100 hover:bg-slate-200 text-slate-800"
+              }`}
             >
               Add New Stock
             </button>
+            <a
+              href="https://imagekit.io/dashboard/media-library/L0VQLUVEVUNBVElPTiBJTlZFTlRPUlkgU1RPQ0tT"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`px-5 py-3.5 font-black text-[11px] uppercase tracking-wide rounded-full transition-all active:scale-95 flex items-center gap-1.5 no-underline cursor-pointer border ${
+                isDark 
+                  ? "bg-[#111215] hover:bg-zinc-800 text-zinc-200 border-[#25272c] hover:text-[#c5f82a]" 
+                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm hover:text-[#f05a3e]"
+              }`}
+            >
+              <Image className="w-3.5 h-3.5" />
+              <span>Imagekit Media</span>
+            </a>
           </div>
         </div>
 
         {/* Isometric SVG Illustration of the Warehouse, roads, delivery lines identical to mockup */}
         <div className="relative w-full max-w-[280px] xl:max-w-[340px] aspect-[1.3] z-10 shrink-0 self-center">
-          <svg viewBox="0 0 400 300" className="w-full h-full text-slate-200 select-none drop-shadow-sm">
+          <svg viewBox="0 0 400 300" className="w-full h-full text-slate-205 select-none drop-shadow-sm">
             {/* Grid line patterns */}
             <g opacity="0.15">
-              <line x1="50" y1="150" x2="350" y2="150" stroke="#f05a3e" strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="200" y1="50" x2="200" y2="250" stroke="#f05a3e" strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="50" y1="150" x2="350" y2="150" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="200" y1="50" x2="200" y2="250" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="1" strokeDasharray="3,3" />
             </g>
 
-            {/* Pathways - Light Gray Roads in Isometic projection angle */}
-            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke="#eef0f3" strokeWidth="12" strokeLinecap="round" />
-            <path d="M 120,250 L 250,185 L 200,160 Z" fill="none" stroke="#eef0f3" strokeWidth="8" strokeLinejoin="round" />
-            <path d="M 250,185 L 350,235" fill="none" stroke="#eef0f3" strokeWidth="10" strokeLinecap="round" />
+            {/* Pathways - Roads in Isometic projection angle */}
+            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke={isDark ? "#24262c" : "#eef0f3"} strokeWidth="12" strokeLinecap="round" />
+            <path d="M 120,250 L 250,185 L 200,160 Z" fill="none" stroke={isDark ? "#24262c" : "#eef0f3"} strokeWidth="8" strokeLinejoin="round" />
+            <path d="M 250,185 L 350,235" fill="none" stroke={isDark ? "#24262c" : "#eef0f3"} strokeWidth="10" strokeLinecap="round" />
 
-            {/* Glowing Flow Paths - orange/red gradient stroke */}
-            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke="#f05a3e" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5, 15" className="animate-[dash_4s_linear_infinite]" style={{ strokeDashoffset: -20 }} />
+            {/* Glowing Flow Paths - brand gradient stroke */}
+            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5, 15" className="animate-[dash_4s_linear_infinite]" style={{ strokeDashoffset: -20 }} />
 
             {/* Isometric Cubes (Buildings/Warehouses) */}
             {/* Building 1 - Left background block */}
             <g transform="translate(140, 70)">
-              {/* Left face */}
-              <path d="M 0,25 L 25,12.5 L 25,50 L 0,62.5 Z" fill="#e2e8f0" />
-              {/* Right face */}
-              <path d="M 25,12.5 L 50,25 L 50,62.5 L 25,50 Z" fill="#cbd5e1" />
-              {/* Top face */}
-              <path d="M 0,25 L 25,12.5 L 50,25 L 25,37.5 Z" fill="#f8fafc" />
+              <path d="M 0,25 L 25,12.5 L 25,50 L 0,62.5 Z" fill={isDark ? "#121315" : "#e2e8f0"} />
+              <path d="M 25,12.5 L 50,25 L 50,62.5 L 25,50 Z" fill={isDark ? "#1a1b1f" : "#cbd5e1"} />
+              <path d="M 0,25 L 25,12.5 L 50,25 L 25,37.5 Z" fill={isDark ? "#2d3039" : "#f8fafc"} />
             </g>
 
-            {/* Building 2 - Main Center red glowing entry point */}
+            {/* Building 2 - Main Center entrance point */}
             <g transform="translate(260, 45)">
-              <path d="M 0,35 L 35,17.5 L 35,70 L 0,87.5 Z" fill="#cbd5e1" />
-              <path d="M 35,17.5 L 70,35 L 70,87.5 L 35,70 Z" fill="#94a3b8" />
-              <path d="M 0,35 L 35,17.5 L 70,35 L 35,52.5 Z" fill="#f1f5f9" />
-              {/* Soft red glow entrance door on side */}
-              <path d="M 10,65 L 25,57.5 L 25,80 L 10,87 Z" fill="#fecaca" />
-              <path d="M 13,67 L 22,62.5 L 22,78 L 13,82 Z" fill="#f05a3e" opacity="0.9" />
+              <path d="M 0,35 L 35,17.5 L 35,70 L 0,87.5 Z" fill={isDark ? "#121315" : "#cbd5e1"} />
+              <path d="M 35,17.5 L 70,35 L 70,87.5 L 35,70 Z" fill={isDark ? "#1a1b1f" : "#94a3b8"} />
+              <path d="M 0,35 L 35,17.5 L 70,35 L 35,52.5 Z" fill={isDark ? "#2d3039" : "#f1f5f9"} />
+              {/* glow entrance door on side */}
+              <path d="M 10,65 L 25,57.5 L 25,80 L 10,87 Z" fill={isDark ? "#c5f82a" : "#fecaca"} opacity="0.3" />
+              <path d="M 13,67 L 22,62.5 L 22,78 L 13,82 Z" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.9" />
             </g>
 
             {/* Building 3 - Front small block layout */}
             <g transform="translate(70, 190)">
-              <path d="M 0,20 L 20,10 L 20,40 L 0,50 Z" fill="#e2e8f0" />
-              <path d="M 20,10 L 40,20 L 40,50 L 20,40 Z" fill="#cbd5e1" />
-              <path d="M 0,20 L 20,10 L 40,20 L 20,30 Z" fill="#f8fafc" />
+              <path d="M 0,20 L 20,10 L 20,40 L 0,50 Z" fill={isDark ? "#121315" : "#e2e8f0"} />
+              <path d="M 20,10 L 40,20 L 40,50 L 20,40 Z" fill={isDark ? "#1a1b1f" : "#cbd5e1"} />
+              <path d="M 0,20 L 20,10 L 40,20 L 20,30 Z" fill={isDark ? "#2d3039" : "#f8fafc"} />
             </g>
 
             <g transform="translate(290, 190)">
-              <path d="M 0,22 L 22,11 L 22,44 L 0,55 Z" fill="#e2e8f0" />
-              <path d="M 22,11 L 44,22 L 44,55 L 22,44 Z" fill="#cbd5e1" />
-              <path d="M 0,22 L 22,11 L 44,22 L 22,33 Z" fill="#f8fafc" />
+              <path d="M 0,22 L 22,11 L 22,44 L 0,55 Z" fill={isDark ? "#121315" : "#e2e8f0"} />
+              <path d="M 22,11 L 44,22 L 44,55 L 22,44 Z" fill={isDark ? "#1a1b1f" : "#cbd5e1"} />
+              <path d="M 0,22 L 22,11 L 44,22 L 22,33 Z" fill={isDark ? "#2d3039" : "#f8fafc"} />
             </g>
 
-            {/* Red Marker circles and Pulsing Location dots identical to the image mockups */}
-            <circle cx="90" cy="200" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
-            <circle cx="90" cy="200" r="5" fill="#f05a3e" />
+            {/* Marker circles and Pulsing Location dots */}
+            <circle cx="90" cy="200" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
+            <circle cx="90" cy="200" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
 
-            <circle cx="170" cy="120" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
-            <circle cx="170" cy="120" r="5" fill="#f05a3e" />
+            <circle cx="170" cy="120" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
+            <circle cx="170" cy="120" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
 
-            <circle cx="280" cy="210" r="12" fill="#f05a3e" opacity="0.15" className="animate-pulse" />
-            <circle cx="280" cy="210" r="5" fill="#f05a3e" />
+            <circle cx="280" cy="210" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
+            <circle cx="280" cy="210" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
           </svg>
         </div>
+      </div>
+
+      {/* SALES PENDING CONFIRMATION QUEUE */}
+      <div className={`p-6 border rounded-[24px] flex flex-col transition-all duration-300 ${
+        isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3] shadow-[0_8px_30px_rgba(0,0,0,0.01)]"
+      }`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between mb-5 border-b pb-3 gap-2 ${
+          isDark ? "border-[#25272c]" : "border-slate-100"
+        }`}>
+          <div>
+            <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <ClipboardList className={`w-4.5 h-4.5 ${isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]'}`} />
+              Sales Pending Confirmation
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Pending approval order card deck</p>
+          </div>
+          <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border shrink-0 sm:self-center ${
+            isDark 
+              ? "bg-[#c5f82a]/10 border-[#c5f82a]/30 text-[#c5f82a]" 
+              : "bg-orange-50 border-orange-200 text-[#f05a3e]"
+          }`}>
+            {statuses.filter(s => s.status === 'Reserve').length} ORDER CARDS WAITING
+          </span>
+        </div>
+
+        {statuses.filter(s => s.status === 'Reserve').length === 0 ? (
+          <div className="py-12 text-center text-slate-500 font-bold text-xs uppercase tracking-widest leading-loose">
+            🎉 All sales order cards are verified and processed! <br /> No pending confirmations left.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {statuses.filter(s => s.status === 'Reserve').map((item, idx) => (
+              <div 
+                key={`pending-card-${item.id || idx}`} 
+                className={`p-5 border rounded-2xl flex flex-col justify-between transition-all group relative overflow-hidden ${
+                  isDark 
+                    ? "bg-[#111215] border-[#24262b] hover:border-[#c5f82a]/30" 
+                    : "bg-slate-50 border-slate-100 hover:border-[#f05a3e]/30 shadow-3xs"
+                }`}
+              >
+                <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full pointer-events-none flex items-center justify-center ${
+                  isDark ? "bg-[#c5f82a]/5" : "bg-[#f05a3e]/5"
+                }`}>
+                  <span className={`text-[8px] font-bold absolute top-2.5 right-3.5 uppercase ${
+                    isDark ? "text-[#c5f82a]" : "text-[#f05a3e]"
+                  }`}>Deck</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <span className={`font-mono text-xs font-black px-2.5 py-0.5 rounded-lg border shadow-3xs ${
+                      isDark 
+                        ? "bg-[#1c1d21] border-[#25272c] text-white group-hover:bg-[#c5f82a]/10 group-hover:border-[#c5f82a]/20" 
+                        : "bg-white border-slate-200 text-slate-700 group-hover:bg-[#f05a3e]/5 group-hover:border-[#f05a3e]/20"
+                    }`}>
+                      {item.order || 'ORD-UNKNOWN'}
+                    </span>
+                    <span className="text-[8px] font-black uppercase text-amber-650 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-100">
+                      Reserve Wait
+                    </span>
+                  </div>
+                  <h4 className={`text-xs font-black uppercase tracking-tight truncate mb-1.5 ${
+                    isDark ? "text-white" : "text-slate-800"
+                  }`}>
+                    {item.item}
+                  </h4>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 mb-4">
+                    <span>Qty: <strong className={isDark ? "text-zinc-200 font-extrabold" : "text-slate-800 font-extrabold"}>{item.qty} pcs</strong></span>
+                    <span className="text-slate-300 font-normal">•</span>
+                    <span>WH: <strong className={isDark ? "text-zinc-200 font-extrabold" : "text-slate-800 font-extrabold"}>{item.where}</strong></span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleConfirmReservation(item)}
+                  className={`w-full py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
+                    isDark 
+                      ? "bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-md shadow-[#c5f82a]/10" 
+                      : "bg-[#f05a3e] hover:bg-[#d44327] text-white shadow-md shadow-[#f05a3e]/10"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Confirm order sale</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Metrics Row Section exactly matching layout label */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-display font-bold text-slate-800">Metrics</h3>
-          <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-500 shadow-3xs cursor-pointer hover:bg-slate-50">
-            <span>This Week</span>
+          <h3 className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-800'}`}>Metrics Snapshot</h3>
+          <div className={`flex items-center gap-1.5 border px-3 py-1.5 rounded-full text-[10px] font-bold shadow-3xs cursor-pointer transition-colors ${
+            isDark ? "bg-[#111215] border-[#24262b] text-zinc-400" : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+          }`}>
+            <span>This Month</span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </div>
         </div>
 
-        {/* Three highly stylized Cards from the mockup image */}
+        {/* 3 highly stylized Cards matching light/dark theme preference */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Card 1: Total Revenue (Total Stock representation) */}
-          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
-            <div className="flex items-center gap-2 text-slate-400">
-              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
-                <Package className="w-3.5 h-3.5 text-slate-500" />
+
+          {/* Card 1: Sales Pending Confirmation Count (Pastel Lavender) */}
+          <div className="p-6 border-1.5 border-[#111215] dark:border-zinc-200 rounded-[24px] relative overflow-hidden flex flex-col justify-between h-44 pastel-lavender shadow-[3.5px_3.5px_0px_0px_var(--neo-shadow)] hover:translate-y-[-1.5px] hover:shadow-[5px_5px_0px_0px_var(--neo-shadow)] transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
+                <ClipboardList className="w-3.5 h-3.5 text-[#f05a3e]" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest">Total Inventory Stock</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#0c0101]">Sales to Confirm</span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-3xl font-extrabold text-slate-800">
-                {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
+              <span className={`text-5xl font-display font-black tracking-tight ${isDark ? "text-white" : "text-black"}`}>
+                {statuses.filter(s => s.status === 'Reserve').length}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">Pcs</span>
+              <span className="text-[10px] font-black uppercase tracking-widest font-mono text-[#f05a3e]">Pending</span>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-              <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                67% ↑ vs Last week
+            <div className="flex items-center justify-between border-t border-[#111215]/10 pt-3">
+              <span className="text-[10px] font-bold flex items-center gap-1 text-[#f05a3e]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#f05a3e] animate-pulse" />
+                Requires approval
               </span>
-              
-              {/* Wavy lines decoration like in first card */}
               <div className="h-10 w-24 opacity-80">
-                <svg viewBox="0 0 100 40" className="w-full h-full text-blue-500">
-                  <path d="M 0,35 Q 15,10 30,25 T 60,15 T 85,30 T 100,10" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  <circle cx="100" cy="10" r="3" fill="currentColor" />
+                <svg viewBox="0 0 100 40" className="w-full h-full text-[#f05a3e]">
+                  <path d="M 0,35 Q 20,40 40,15 T 70,25 T 100,5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  <circle cx="100" cy="5" r="3.5" fill="currentColor" />
                 </svg>
               </div>
             </div>
           </div>
 
-          {/* Card 2: Total Shipments (Hold Reservations) */}
-          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
-            <div className="flex items-center gap-2 text-slate-400">
-              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
-                <Bookmark className="w-3.5 h-3.5 text-slate-500" />
+          {/* Card 2: Total Active Holds (Pastel Mint) */}
+          <div className="p-6 border-1.5 border-[#111215] dark:border-zinc-200 rounded-[24px] relative overflow-hidden flex flex-col justify-between h-44 pastel-mint shadow-[3.5px_3.5px_0px_0px_var(--neo-shadow)] hover:translate-y-[-1.5px] hover:shadow-[5px_5px_0px_0px_var(--neo-shadow)] transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
+                <Bookmark className="w-3.5 h-3.5 text-[#11c250]" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest">Total Active Holds</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#0f0101]">Active holds</span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-3xl font-extrabold text-slate-800">
+              <span className={`text-5xl font-display font-black tracking-tight ${isDark ? "text-white" : "text-black"}`}>
                 {reservations.length}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">Claims</span>
+              <span className="text-[10px] font-bold text-slate-800 dark:text-zinc-100 font-mono uppercase tracking-widest">Claims</span>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+            <div className="flex items-center justify-between border-t border-[#111215]/10 pt-3">
               <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                67% ↑ vs Last week
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                Hold active
               </span>
-              
-              {/* Radial Arc line like card two */}
               <div className="h-12 w-12 mr-2">
-                <svg viewBox="0 0 36 36" className="w-full h-full text-[#f05a3e]">
-                  {/* Background loop */}
-                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" strokeWidth="3" />
-                  {/* Highlighted arc loop representing percentage */}
+                <svg viewBox="0 0 36 36" className="w-full h-full text-emerald-600">
+                  <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth="3" />
                   <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 12.5 25.5" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
                 </svg>
               </div>
             </div>
           </div>
 
-          {/* Card 3: Total Delivery (Status Logs count) */}
-          <div className="p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] relative overflow-hidden flex flex-col justify-between h-44">
-            <div className="flex items-center gap-2 text-slate-400">
-              <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
-                <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+          {/* Card 3: Total Tracked Loads (Pastel Peach) */}
+          <div className="p-6 border-1.5 border-[#111215] dark:border-zinc-200 rounded-[24px] relative overflow-hidden flex flex-col justify-between h-44 pastel-peach shadow-[3.5px_3.5px_0px_0px_var(--neo-shadow)] hover:translate-y-[-1.5px] hover:shadow-[5px_5px_0px_0px_var(--neo-shadow)] transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
+                <ClipboardList className="w-3.5 h-3.5 text-purple-600" />
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest">Total Tracked Loads</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#070000]">Logs Audit Entries</span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="text-3xl font-extrabold text-slate-800">
+              <span className={`text-5xl font-display font-black tracking-tight ${isDark ? "text-white" : "text-black"}`}>
                 {statuses.length}
               </span>
-              <span className="text-[11px] font-bold text-slate-400">Entries</span>
+              <span className="text-[10px] font-bold text-slate-800 dark:text-zinc-100 font-mono uppercase tracking-widest">Logs</span>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-50 pt-3">
+            <div className="flex items-center justify-between border-t border-[#111215]/10 pt-3">
               <span className="text-[10px] font-bold text-purple-600 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-                37% ↑ vs Last week
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" />
+                Audited
               </span>
-              
-              {/* Violet dense filled area sparkline decoration of card three */}
               <div className="h-10 w-24 opacity-80">
-                <svg viewBox="0 0 100 40" className="w-full h-full text-purple-500">
-                  <path d="M 0,40 L 0,35 Q 12,20 25,32 T 50,15 T 75,28 T 100,5 L 100,40 Z" fill="rgba(139, 92, 246, 0.15)" />
+                <svg viewBox="0 0 100 40" className="w-full h-full text-purple-600">
                   <path d="M 0,35 Q 12,20 25,32 T 50,15 T 75,28 T 100,5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   <circle cx="100" cy="5" r="3" fill="currentColor" />
                 </svg>
@@ -1118,94 +1308,128 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left Side Section: Inventory Snapshot */}
-        <div className="lg:col-span-3 p-6 bg-white border border-[#eef0f3] rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.015)] flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
+        <div className={`p-8 border rounded-[32px] flex flex-col justify-between lg:col-span-3 ${
+          isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3] shadow-[0_12px_40px_rgba(0,0,0,0.015)]"
+        }`}>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 mb-6 gap-4 border-slate-200 dark:border-zinc-800/30">
             <div>
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Inventory Snapshot</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Site selection filter</p>
+              <h3 className={`text-base font-black uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-white" : "text-slate-800"}`}>
+                <Package className="w-5 h-5 text-[#f05a3e]" />
+                Total Inventory Stock
+              </h3>
+              <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isDark ? "text-zinc-400" : "text-slate-400"}`}>
+                Complete physical asset count & site distribution logic
+              </p>
             </div>
             
-            <div className="flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-full text-[10px] font-bold text-slate-500 shadow-3xs cursor-pointer hover:bg-slate-50">
-              <span>This Week</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
+            {/* Styled exactly identical to the dark grey container shown in image 1, but with deep charcoal for superb high-contrast legibility */}
+            <div className="flex items-baseline gap-2.5 bg-[#1b1c1e] px-6 py-2.5 rounded-[18px] shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),_0_4px_12px_rgba(0,0,0,0.15)] border border-[#2a2b2f] shrink-0">
+              <span className="text-[#ff5232] font-display text-3xl font-black tracking-tight leading-none filter drop-shadow-[0_1px_2px_rgba(255,82,50,0.15)]">
+                {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
+              </span>
+              <span className="text-[#9eaab6] text-[10px] font-black uppercase tracking-wide font-mono leading-none">
+                PCS TOTAL
+              </span>
             </div>
           </div>
 
-          {/* Sub-header value stats */}
-          <div className="mb-6 flex items-baseline gap-2">
-            <span className="text-4xl font-display font-extrabold text-slate-800">
-              {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
-            </span>
-            <span className="text-[10.5px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
-              Current Stock
-            </span>
-          </div>
-
-          {/* Rounded bar columns in active dark grey layout with Saturday Tooltip popup as in image */}
-          <div className="relative h-64 w-full flex items-end justify-between px-3 border-b border-slate-100 bg-slate-50/20 rounded-2xl p-4">
-            
-            {/* Grid background lines */}
-            <div className="absolute inset-x-0 top-1/4 border-t border-slate-100/50" />
-            <div className="absolute inset-x-0 top-2/4 border-t border-slate-100/50" />
-            <div className="absolute inset-x-0 top-3/4 border-t border-slate-100/50" />
-
-            {/* Sunday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-24 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Sun</span>
-            </div>
-            
-            {/* Monday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-32 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Mon</span>
-            </div>
-
-            {/* Tuesday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-40 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Tue</span>
-            </div>
-
-            {/* Wednesday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-28 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Wed</span>
-            </div>
-
-            {/* Thursday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-44 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Thu</span>
-            </div>
-
-            {/* Friday pillar */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer">
-              <div className="w-10 bg-slate-300 group-hover:bg-[#f05a3e] h-36 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Fri</span>
-            </div>
-
-            {/* Saturday Pillar (THE ACTIVE CHOSEN PILL FROM THE MOCKUP IMAGE) */}
-            <div className="flex flex-col items-center gap-2 group cursor-pointer relative">
-              {/* Tooltip Overlay exact match */}
-              <div className="absolute -top-14 bg-slate-900 text-white rounded-xl py-1.5 px-3 z-10 shadow-lg text-center leading-none select-none flex flex-col gap-1 w-20">
-                <span className="text-[8px] text-slate-400 font-bold uppercase text-[7.5px]">Saturday</span>
-                <span className="text-[10px] font-extrabold font-mono">
-                  {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) > 0 
-                    ? inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString() 
-                    : "559,128"}
-                </span>
-                <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 mx-auto -mb-2.5 mt-0.5" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Left side: Site-wise breakdown progress bars */}
+            <div className="space-y-5">
+              <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? "text-zinc-350" : "text-slate-655"}`}>
+                Warehouse Location Distribution
+              </h4>
+              <div className="space-y-4">
+                {[
+                  { 
+                    name: 'Old Warehouse', 
+                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyOld) || 0), 0),
+                    icon: '🏫',
+                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
+                  },
+                  { 
+                    name: 'New Warehouse', 
+                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyNew) || 0), 0),
+                    icon: '🏢',
+                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
+                  },
+                  { 
+                    name: 'Office', 
+                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyOffice) || 0), 0),
+                    icon: '💻',
+                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
+                  }
+                ].map((site) => {
+                  const total = inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) || 1;
+                  const percent = Math.min(100, Math.round((site.qty / total) * 100));
+                  return (
+                    <div key={site.name} className="space-y-1.5">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className={`font-bold flex items-center gap-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                          <span>{site.icon}</span>
+                          <span>{site.name}</span>
+                        </span>
+                        <span className={`font-mono font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                          {site.qty.toLocaleString()} Pcs <span className="text-[10px] text-slate-400">({percent}%)</span>
+                        </span>
+                      </div>
+                      <div className={`h-2.5 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`}>
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${site.color}`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              {/* Pulsing indicator above Saturday */}
-              <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white absolute -top-1.5 z-10 shadow-xs animate-pulse" />
-
-              <div className="w-10 bg-slate-800 group-hover:bg-[#f05a3e] h-48 rounded-t-lg transition-all" />
-              <span className="text-[10px] text-slate-800 font-extrabold uppercase">Sat</span>
             </div>
 
+            {/* Right side: Top items in stock list */}
+            <div className="space-y-4">
+              <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? "text-zinc-350" : "text-slate-655"}`}>
+                Top items in stock list
+              </h4>
+              <div className="space-y-2.5">
+                {[...inventory]
+                  .sort((a, b) => (Number(b.qty) || 0) - (Number(a.qty) || 0))
+                  .slice(0, 3)
+                  .map((item, index) => (
+                    <div 
+                      key={`top-item-${item.id || index}`}
+                      className={`p-3 rounded-xl border flex items-center justify-between ${
+                        isDark ? "bg-[#111215]/50 border-[#24262b]" : "bg-slate-50 border-slate-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`w-6 h-6 rounded-lg font-mono text-[10px] font-black flex items-center justify-center border shadow-3xs ${
+                          isDark ? 'bg-zinc-800 border-zinc-700 text-[#c5f82a]' : 'bg-white border-slate-200 text-[#f05a3e]'
+                        }`}>
+                          #{index + 1}
+                        </span>
+                        <div className="truncate min-w-0">
+                          <p className={`text-xs font-black uppercase truncate leading-none ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                            {item.name}
+                          </p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">
+                            {item.qtyOld || 0} Old • {item.qtyNew || 0} New • {item.qtyOffice || 0} Off
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-wider shrink-0 ${
+                        isDark ? "bg-[#c5f82a]/10 text-[#c5f82a] border-[#c5f82a]/20" : "bg-orange-50 text-[#f05a3e] border-orange-100"
+                      }`}>
+                        {item.qty || 0} Pcs
+                      </span>
+                    </div>
+                  ))}
+                {inventory.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-xs uppercase tracking-wider">
+                    No physical items in catalog
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
