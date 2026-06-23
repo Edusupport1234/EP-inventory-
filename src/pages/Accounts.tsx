@@ -16,6 +16,7 @@ interface UserAccount {
 }
 
 export default function Accounts({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -414,8 +415,11 @@ export default function Accounts({ theme = 'dark' }: { theme?: 'light' | 'dark' 
 
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
-            <Users className="w-6 h-6 text-slate-600 shrink-0" />
+          <h1 
+            className="text-2xl font-black tracking-tight flex items-center gap-2.5"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
+            <Users className="w-6 h-6 text-slate-600 dark:text-zinc-400 shrink-0" />
             <span>User Accounts & Security Command Center</span>
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">Create warehouse auditor logins, update employee passwords, and audit online connection status in real-time.</p>

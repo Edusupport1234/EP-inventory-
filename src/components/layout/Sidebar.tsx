@@ -58,14 +58,14 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
           {/* Logo Section */}
           <div className="h-16 flex items-center px-6 mb-4">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm relative ${
-              isDark ? 'bg-[#c5f82a]' : 'bg-slate-900'
+              isDark ? 'bg-[#ffd053]' : 'bg-[#fc9f62]'
             }`}>
               {/* Geometric style resembling the logo in the picture */}
               <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
                 isDark ? 'bg-[#111215]' : 'bg-white'
               }`}>
                 <div className={`w-1.5 h-1.5 rotate-45 ${
-                  isDark ? 'bg-[#c5f82a]' : 'bg-slate-900'
+                  isDark ? 'bg-[#ffd053]' : 'bg-[#fc9f62]'
                 }`} />
               </div>
             </div>
@@ -97,7 +97,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                     "w-full flex items-center p-3 rounded-2xl transition-all group relative cursor-pointer",
                     isActive 
                       ? (isDark 
-                          ? "bg-[#1c1d21] text-white shadow-[0_4px_20px_rgba(197,248,42,0.06)] border border-[#2d2f35]" 
+                          ? "bg-[#1c1d21] text-white shadow-[0_4px_20px_rgba(255,208,83,0.06)] border border-[#2d2f35]" 
                           : "bg-white text-slate-900 shadow-[0_4px_12px_rgba(0,0,0,0.03)] border border-[#eef0f3]") 
                       : (isDark 
                           ? "text-zinc-400 hover:bg-[#1c1d21]/60 hover:text-white" 
@@ -109,7 +109,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                     <div 
                       className={cn(
                         "absolute left-0 top-3 bottom-3 w-1 rounded-r-full",
-                        isDark ? "bg-[#c5f82a]" : "bg-[#f05a3e]"
+                        isDark ? "bg-[#ffd053]" : "bg-[#fc9f62]"
                       )}
                     />
                   )}
@@ -117,7 +117,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                   <item.icon className={cn(
                     "w-5 h-5 shrink-0 transition-transform group-hover:scale-105",
                     isActive 
-                      ? (isDark ? "text-[#c5f82a]" : "text-[#f05a3e]") 
+                      ? (isDark ? "text-[#ffd053]" : "text-[#fc9f62]") 
                       : "text-slate-400"
                   )} />
                   {isOpen && (
@@ -134,7 +134,7 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, on
                       layoutId="sidebar-active-pill"
                       className={cn(
                         "ml-auto w-1.5 h-1.5 rounded-full",
-                        isDark ? "bg-[#c5f82a]" : "bg-[#f05a3e]"
+                        isDark ? "bg-[#ffd053]" : "bg-[#fc9f62]"
                       )}
                     />
                   )}

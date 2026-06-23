@@ -31,6 +31,7 @@ function getFallbackImage(name: string): string {
 }
 
 export default function Inventory({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [search, setSearch] = useState('');
   const [products, setProducts] = useState<any[]>([]);
   const [reservations, setReservations] = useState<any[]>([]);
@@ -660,7 +661,12 @@ export default function Inventory({ theme = 'dark' }: { theme?: 'light' | 'dark'
       {/* Target UI Title Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e6decf] pb-4">
         <div>
-          <h1 className="text-2xl font-black text-[#1E293B] tracking-tight">Adjust Stock</h1>
+          <h1 
+            className="text-2xl font-black tracking-tight"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
+            Adjust Stock
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <button 

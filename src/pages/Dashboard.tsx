@@ -52,6 +52,181 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
   const [addStockSource, setAddStockSource] = useState<'existing' | 'new'>('existing');
   const [selectedAddStockId, setSelectedAddStockId] = useState('');
 
+  // Dynamic Warehouse & Location Management States
+  const defaultWarehouses = [
+    { id: 'old', key: 'qtyOld', name: 'Old warehouse', icon: '🏫' },
+    { id: 'new', key: 'qtyNew', name: 'New warehouse', icon: '🏢' },
+    { id: 'office', key: 'qtyOffice', name: 'Office', icon: '💻' }
+  ];
+  const [warehouses, setWarehouses] = useState<any[]>(defaultWarehouses);
+  const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
+  const [editingWarehouseName, setEditingWarehouseName] = useState<string>('');
+  const [newWarehouseName, setNewWarehouseName] = useState<string>('');
+  const [selectedWarehouseIcon, setSelectedWarehouseIcon] = useState<string>('🏢');
+  const [newWarehouseQuantities, setNewWarehouseQuantities] = useState<Record<string, string>>({});
+
+  // Establish live listener database connection to sync locations
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'warehouses'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data && data.list && Array.isArray(data.list)) {
+          setWarehouses(data.list);
+        } else {
+          setWarehouses(defaultWarehouses);
+        }
+      } else {
+        setDoc(doc(db, 'settings', 'warehouses'), { list: defaultWarehouses })
+          .then(() => setWarehouses(defaultWarehouses))
+          .catch(err => console.warn("Error establishing default warehouses in Firestore:", err));
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Update selection defaults based on dynamic loaded warehouses list
+  useEffect(() => {
+    if (warehouses.length > 0) {
+      if (!newItem.location || !warehouses.some(w => w.name === newItem.location)) {
+        setNewItem(prev => ({ ...prev, location: warehouses[0]?.name }));
+      }
+      if (!adjLocation || !warehouses.some(w => w.name === adjLocation)) {
+        setAdjLocation(warehouses[0]?.name);
+      }
+      if (!holdLocation || !warehouses.some(w => w.name === holdLocation)) {
+        setHoldLocation(warehouses[0]?.name);
+      }
+    }
+  }, [warehouses]);
+
+  // Rename action logic
+  const handleRenameWarehouse = async (warehouseId: string, oldName: string, newName: string) => {
+    const nameClean = newName.trim();
+    if (!nameClean || oldName === nameClean) return;
+
+    if (warehouses.some(w => w.id !== warehouseId && w.name.toLowerCase() === nameClean.toLowerCase())) {
+      showToast(`A warehouse named "${nameClean}" already exists!`, "warn");
+      return;
+    }
+
+    const updatedList = warehouses.map(w => w.id === warehouseId ? { ...w, name: nameClean } : w);
+    try {
+      await setDoc(doc(db, 'settings', 'warehouses'), { list: updatedList });
+      setWarehouses(updatedList);
+    } catch (error) {
+      showToast("Failed to update warehouse config: " + error, "error");
+      return;
+    }
+
+    showToast(`Renaming associated stock locations to "${nameClean}"...`, "info");
+    let updateErrors = 0;
+
+    // Inventory items
+    try {
+      const invToUpdate = inventory.filter(item => item.location === oldName);
+      for (const item of invToUpdate) {
+        await updateDoc(doc(db, 'inventory', item.id), { location: nameClean });
+        await update(ref(rtdb, `inventory/${item.id}`), { location: nameClean });
+      }
+    } catch (err) {
+      console.error("Error updating inventory properties:", err);
+      updateErrors++;
+    }
+
+    // Active Reservations Holds
+    try {
+      const resToUpdate = reservations.filter(res => res.location === oldName);
+      for (const res of resToUpdate) {
+        await updateDoc(doc(db, 'reservations', res.id), { location: nameClean });
+        await update(ref(rtdb, `reservations/${res.id}`), { location: nameClean });
+      }
+    } catch (err) {
+      console.error("Error updating reservations properties:", err);
+      updateErrors++;
+    }
+
+    // Active loan statuses
+    try {
+      const statusesToUpdate = statuses.filter(s => s.where === oldName);
+      for (const s of statusesToUpdate) {
+        await updateDoc(doc(db, 'statuses', s.id), { where: nameClean });
+        await update(ref(rtdb, `statuses/${s.id}`), { where: nameClean });
+      }
+    } catch (err) {
+      console.error("Error updating statuses properties:", err);
+      updateErrors++;
+    }
+
+    // Adjustments Logs history
+    try {
+      const { getDocs } = await import('firebase/firestore');
+      const adjSnap = await getDocs(query(collection(db, 'adjustments')));
+      for (const docObj of adjSnap.docs) {
+        const d = docObj.data();
+        if (d.location === oldName) {
+          await updateDoc(doc(db, 'adjustments', docObj.id), { location: nameClean });
+        }
+      }
+    } catch (err) {
+      console.error("Error updating adjustments logs:", err);
+      updateErrors++;
+    }
+
+    if (updateErrors === 0) {
+      showToast(`Successfully renamed folder/location structures from "${oldName}" to "${nameClean}"!`, "info");
+    } else {
+      showToast(`Warehouse identity updated in lists.`, "info");
+    }
+  };
+
+  // Add location logic
+  const handleAddWarehouse = async (name: string, icon: string = '🏢') => {
+    const nameClean = name.trim();
+    if (!nameClean) {
+      showToast("Depot name is required!", "warn");
+      return;
+    }
+
+    if (warehouses.some(w => w.name.toLowerCase() === nameClean.toLowerCase())) {
+      showToast(`A location named "${nameClean}" already exists!`, "warn");
+      return;
+    }
+
+    const safeId = nameClean.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const warehouseKey = `qty_${safeId}`;
+
+    const newWarehouse = {
+      id: safeId,
+      key: warehouseKey,
+      name: nameClean,
+      icon: icon
+    };
+
+    const updatedList = [...warehouses, newWarehouse];
+
+    try {
+      await setDoc(doc(db, 'settings', 'warehouses'), { list: updatedList });
+      setWarehouses(updatedList);
+      showToast(`Successfully registered new location: ${nameClean}!`, "info");
+    } catch (error) {
+      showToast("Failed to create warehouse: " + error, "error");
+    }
+  };
+
+  const handleSaveRename = async (id: string, currentName: string) => {
+    const newNameClean = editingWarehouseName.trim();
+    if (!newNameClean) {
+      showToast("Warehouse name cannot be empty", "warn");
+      return;
+    }
+    if (newNameClean.toLowerCase() === currentName.toLowerCase()) {
+      setEditingWarehouseId(null);
+      return;
+    }
+    await handleRenameWarehouse(id, currentName, newNameClean);
+    setEditingWarehouseId(null);
+  };
+
   // Add Brand New Item to Inventory State
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [newItemDetails, setNewItemDetails] = useState({
@@ -63,6 +238,17 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
     barcode: '',
     imgUrl: ''
   });
+
+  // Track dynamic quantities when adding new catalog item
+  useEffect(() => {
+    if (isAddItemModalOpen) {
+      const initialQtys: Record<string, string> = {};
+      warehouses.forEach(w => {
+        initialQtys[w.key] = '0';
+      });
+      setNewWarehouseQuantities(initialQtys);
+    }
+  }, [isAddItemModalOpen, warehouses]);
 
   // Helper to fallback robotics imagery for newly created items
   const getFallbackImage = (name: string): string => {
@@ -347,8 +533,11 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
     }
 
     const delta = adjMode === 'add' ? amt : -amt;
-    const fieldMap: any = { 'Old warehouse': 'qtyOld', 'New warehouse': 'qtyNew', 'Office': 'qtyOffice' };
-    const field = fieldMap[adjLocation];
+    const fieldMap: Record<string, string> = {};
+    warehouses.forEach(w => {
+      fieldMap[w.name] = w.key;
+    });
+    const field = fieldMap[adjLocation] || 'qtyOld';
     
     const prevVal = item[field] || 0;
     if (adjMode === 'sub' && prevVal < amt) {
@@ -411,11 +600,10 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
       return;
     }
 
-    const fieldMap: any = { 
-      'Old warehouse': 'qtyOld', 
-      'New warehouse': 'qtyNew', 
-      'Office': 'qtyOffice' 
-    };
+    const fieldMap: Record<string, string> = {};
+    warehouses.forEach(w => {
+      fieldMap[w.name] = w.key;
+    });
     const field = fieldMap[holdLocation] || 'qtyOld';
     const currentLocQty = item[field] || 0;
 
@@ -541,13 +729,13 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
       const qtyNum = parseInt(newItem.qty);
       const existing = inventory.find(i => i.name && i.name.toLowerCase() === targetItemName.toLowerCase());
 
+      const fieldMap: Record<string, string> = {};
+      warehouses.forEach(w => {
+        fieldMap[w.name] = w.key;
+      });
+      const field = fieldMap[newItem.location] || 'qtyOld';
+
       if (existing) {
-        const fieldMap: Record<string, string> = {
-          'Old warehouse': 'qtyOld',
-          'New warehouse': 'qtyNew',
-          'Office': 'qtyOffice'
-        };
-        const field = fieldMap[newItem.location] || 'qtyOld';
         const currentQty = existing[field] || 0;
         const finalQty = (existing.qty || 0) + qtyNum;
 
@@ -567,43 +755,43 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
           });
         } catch (e) {}
       } else {
-        const qtyOld = newItem.location === 'Old warehouse' ? qtyNum : 0;
-        const qtyNew = newItem.location === 'New warehouse' ? qtyNum : 0;
-        const qtyOffice = newItem.location === 'Office' ? qtyNum : 0;
-
         // Custom document ID to match in both
-         const customId = doc(collection(db, 'inventory')).id;
+        const customId = doc(collection(db, 'inventory')).id;
 
-        // Write to Realtime Database
-        await set(ref(rtdb, `inventory/${customId}`), {
+        const rtdbPayload: any = {
           name: targetItemName,
-          qtyOld,
-          qtyNew,
-          qtyOffice,
           qty: qtyNum,
           location: newItem.location,
           goal: 5,
           barcodes: [],
           isNew: true,
           createdAt: Date.now()
-        });
+        };
 
-        // Write to Firestore
-        await setDoc(doc(db, 'inventory', customId), {
+        const firestorePayload: any = {
           name: targetItemName,
-          qtyOld,
-          qtyNew,
-          qtyOffice,
           qty: qtyNum,
           location: newItem.location,
           goal: 5,
           barcodes: [],
           isNew: true,
           createdAt: serverTimestamp()
+        };
+
+        warehouses.forEach(w => {
+          const matchedVal = w.name === newItem.location ? qtyNum : 0;
+          rtdbPayload[w.key] = matchedVal;
+          firestorePayload[w.key] = matchedVal;
         });
+
+        // Write to Realtime Database
+        await set(ref(rtdb, `inventory/${customId}`), rtdbPayload);
+
+        // Write to Firestore
+        await setDoc(doc(db, 'inventory', customId), firestorePayload);
       }
       setIsAddModalOpen(false);
-      setNewItem({ name: '', qty: '', location: 'Old warehouse' });
+      setNewItem({ name: '', qty: '', location: warehouses[0]?.name || 'Old warehouse' });
       setAddStockSource('existing');
       setSelectedAddStockId('');
       showToast("Stock added successfully!", "info");
@@ -629,10 +817,22 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
         return;
       }
 
-      const qOld = parseInt(newItemDetails.qtyOld) || 0;
-      const qNew = parseInt(newItemDetails.qtyNew) || 0;
-      const qOffice = parseInt(newItemDetails.qtyOffice) || 0;
-      const totalQty = qOld + qNew + qOffice;
+      let totalQty = 0;
+      const warehouseQties: Record<string, number> = {};
+      let maxQty = -1;
+      let mainLocation = warehouses[0]?.name || 'Old warehouse';
+
+      warehouses.forEach(w => {
+        const qStr = newWarehouseQuantities[w.key] || '0';
+        const qVal = parseInt(qStr, 10) || 0;
+        warehouseQties[w.key] = qVal;
+        totalQty += qVal;
+        if (qVal > maxQty) {
+          maxQty = qVal;
+          mainLocation = w.name;
+        }
+      });
+
       const stockGoal = parseInt(newItemDetails.goal) || 0;
       const barcodes = newItemDetails.barcode.trim() ? [newItemDetails.barcode.trim()] : [];
       const img = newItemDetails.imgUrl.trim() || getFallbackImage(nameClean);
@@ -640,14 +840,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
       // Custom document ID to match in both DBs
       const customId = doc(collection(db, 'inventory')).id;
 
-      const mainLocation = qOffice > qOld && qOffice > qNew ? 'Office' : (qNew > qOld ? 'New warehouse' : 'Old warehouse');
-
-      // 1. Write to Realtime Database
-      await set(ref(rtdb, `inventory/${customId}`), {
+      const rtdbPayload: any = {
         name: nameClean,
-        qtyOld: qOld,
-        qtyNew: qNew,
-        qtyOffice: qOffice,
         qty: totalQty,
         goal: stockGoal,
         barcodes,
@@ -655,14 +849,10 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
         location: mainLocation,
         isNew: true,
         createdAt: Date.now()
-      });
+      };
 
-      // 2. Write to Firestore
-      await setDoc(doc(db, 'inventory', customId), {
+      const firestorePayload: any = {
         name: nameClean,
-        qtyOld: qOld,
-        qtyNew: qNew,
-        qtyOffice: qOffice,
         qty: totalQty,
         goal: stockGoal,
         barcodes,
@@ -670,7 +860,19 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
         location: mainLocation,
         isNew: true,
         createdAt: serverTimestamp()
+      };
+
+      warehouses.forEach(w => {
+        const qVal = warehouseQties[w.key] || 0;
+        rtdbPayload[w.key] = qVal;
+        firestorePayload[w.key] = qVal;
       });
+
+      // 1. Write to Realtime Database
+      await set(ref(rtdb, `inventory/${customId}`), rtdbPayload);
+
+      // 2. Write to Firestore
+      await setDoc(doc(db, 'inventory', customId), firestorePayload);
 
       setIsAddItemModalOpen(false);
       setNewItemDetails({
@@ -687,17 +889,15 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
       handleFirestoreError(error, OperationType.WRITE, 'inventory');
     }
   };
-
   const handleConfirmReservation = async (record: any) => {
     try {
       // 1. Subtract from physical location stock and overall total in Firestore & RTDB
       const matchingProduct = inventory.find(p => p.name.toLowerCase() === record.item.toLowerCase());
       if (matchingProduct) {
-        const fieldMap: { [key: string]: string } = { 
-          'Old warehouse': 'qtyOld', 
-          'New warehouse': 'qtyNew', 
-          'Office': 'qtyOffice' 
-        };
+        const fieldMap: Record<string, string> = {};
+        warehouses.forEach(w => {
+          fieldMap[w.name] = w.key;
+        });
         const field = fieldMap[record.where] || 'qtyOld';
         const currentLocQty = matchingProduct[field] || 0;
 
@@ -783,16 +983,31 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
   };
 
   const stats = [
-    { label: 'Total Inventory', value: inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString(), icon: Package, color: 'text-[#f05a3e]', bg: 'bg-orange-50', change: '+12%', positive: true },
+    { label: 'Total Inventory', value: inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString(), icon: Package, color: 'text-[#fc9f62]', bg: 'bg-[#fc9f62]/10', change: '+12%', positive: true },
     { label: 'Registered SKU', value: inventory.length, icon: Tag, color: 'text-emerald-600', bg: 'bg-emerald-50', change: '+8%', positive: true },
     { label: 'Low Stock Items', value: inventory.filter(i => (Number(i.qty) || 0) < 5).length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50', change: '-3%', positive: false },
     { label: 'Warehouse Load', value: '88%', icon: CheckCircle2, color: 'text-rose-600', bg: 'bg-rose-50', change: '0%', positive: true },
   ];
 
   // Dynamic stock calculations per location for the trend chart
-  const oldWarehouseQty = inventory.filter(item => item.location === 'Old warehouse').reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
-  const newWarehouseQty = inventory.filter(item => item.location === 'New warehouse').reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
-  const officeQty = inventory.filter(item => item.location === 'Office').reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
+  const oldWarehouseQty = inventory.filter(item => {
+    const matchedWh = warehouses.find(w => w.id === 'old');
+    const nameToMatch = matchedWh ? matchedWh.name : 'Old warehouse';
+    return item.location === nameToMatch;
+  }).reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
+
+  const newWarehouseQty = inventory.filter(item => {
+    const matchedWh = warehouses.find(w => w.id === 'new');
+    const nameToMatch = matchedWh ? matchedWh.name : 'New warehouse';
+    return item.location === nameToMatch;
+  }).reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
+
+  const officeQty = inventory.filter(item => {
+    const matchedWh = warehouses.find(w => w.id === 'office');
+    const nameToMatch = matchedWh ? matchedWh.name : 'Office';
+    return item.location === nameToMatch;
+  }).reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
+
   const totalQty = oldWarehouseQty + newWarehouseQty + officeQty;
 
   const displayTotal = totalQty === 0 ? 3490 : totalQty;
@@ -833,10 +1048,13 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
     <div className={`space-y-6 animate-in fade-in duration-500 pb-12 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
       
       {/* Top Header Row with Title and Integrated Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className={`text-3xl font-display font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            EP <span className={isDark ? "text-[#c5f82a]" : "text-[#f05a3e]"}>Dashboard</span>
+          <h1 
+            className="text-3xl font-display font-black tracking-tight uppercase"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
+            EP <span className={isDark ? "text-[#ffd053]" : "text-[#fc9f62]"}>Dashboard</span>
           </h1>
         </div>
         <div id="dashboard-stock-locator" className="flex items-center gap-4 shrink-0 max-w-md w-full sm:w-auto">
@@ -853,8 +1071,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
               onFocus={() => setShowDashboardSearchDropdown(true)}
               className={`w-full rounded-full py-2.5 pl-10 pr-4 text-xs font-semibold outline-none transition-all focus:ring-4 ${
                 isDark 
-                  ? "bg-[#1c1d21] border border-[#25272c] text-white focus:border-[#c5f82a] focus:ring-[#c5f82a]/15" 
-                  : "bg-white border border-slate-200 text-slate-800 focus:border-[#f05a3e] focus:ring-[#f05a3e]/10"
+                  ? "bg-[#1c1d21] border border-[#25272c] text-white focus:border-[#ffd053] focus:ring-[#ffd053]/15" 
+                  : "bg-white border border-slate-200 text-slate-800 focus:border-[#fc9f62] focus:ring-[#fc9f62]/10"
               }`}
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -920,7 +1138,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
             )}
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Locator Results Popout */}
       {selectedLocateItem && (
@@ -976,7 +1194,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                   window.dispatchEvent(new CustomEvent('change-tab', { detail: 'locations' }));
                 }}
                 className={`flex-1 md:flex-initial px-5 py-3 font-black text-[10px] uppercase tracking-widest rounded-full transition-all shadow-md active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
-                  isDark ? 'bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-lg' : 'bg-[#f05a3e] hover:bg-[#d44327] text-white'
+                  isDark ? 'bg-[#ffd053] hover:bg-[#ebbe46] text-black shadow-lg' : 'bg-[#fc9f62] hover:bg-[#e38344] text-white'
                 }`}
               >
                 <MapPin className="w-3.5 h-3.5" />
@@ -1017,7 +1235,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
             <button
               onClick={() => setIsAddItemModalOpen(true)}
               className={`px-6 py-3.5 font-extrabold text-[11px] uppercase tracking-wider rounded-full transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
-                isDark ? "bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-lg" : "bg-[#f05a3e] hover:bg-[#d44327] text-white shadow-md shadow-[#f05a3e]/15"
+                isDark ? "bg-[#ffd053] hover:bg-[#ebbe46] text-black shadow-lg" : "bg-[#fc9f62] hover:bg-[#e38344] text-white shadow-md shadow-[#fc9f62]/15"
               }`}
             >
               <Plus className="w-4 h-4 stroke-[2.5px]" />
@@ -1037,8 +1255,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
               rel="noopener noreferrer"
               className={`px-5 py-3.5 font-black text-[11px] uppercase tracking-wide rounded-full transition-all active:scale-95 flex items-center gap-1.5 no-underline cursor-pointer border ${
                 isDark 
-                  ? "bg-[#111215] hover:bg-zinc-800 text-zinc-200 border-[#25272c] hover:text-[#c5f82a]" 
-                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm hover:text-[#f05a3e]"
+                  ? "bg-[#111215] hover:bg-zinc-800 text-zinc-200 border-[#25272c] hover:text-[#ffd053]" 
+                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm hover:text-[#fc9f62]"
               }`}
             >
               <Image className="w-3.5 h-3.5" />
@@ -1052,8 +1270,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
           <svg viewBox="0 0 400 300" className="w-full h-full text-slate-205 select-none drop-shadow-sm">
             {/* Grid line patterns */}
             <g opacity="0.15">
-              <line x1="50" y1="150" x2="350" y2="150" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="1" strokeDasharray="3,3" />
-              <line x1="200" y1="50" x2="200" y2="250" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="50" y1="150" x2="350" y2="150" stroke={isDark ? "#ffd053" : "#fc9f62"} strokeWidth="1" strokeDasharray="3,3" />
+              <line x1="200" y1="50" x2="200" y2="250" stroke={isDark ? "#ffd053" : "#fc9f62"} strokeWidth="1" strokeDasharray="3,3" />
             </g>
 
             {/* Pathways - Roads in Isometic projection angle */}
@@ -1062,7 +1280,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
             <path d="M 250,185 L 350,235" fill="none" stroke={isDark ? "#24262c" : "#eef0f3"} strokeWidth="10" strokeLinecap="round" />
 
             {/* Glowing Flow Paths - brand gradient stroke */}
-            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke={isDark ? "#c5f82a" : "#f05a3e"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5, 15" className="animate-[dash_4s_linear_infinite]" style={{ strokeDashoffset: -20 }} />
+            <path d="M 50,180 L 170,120 L 220,145 L 350,80" fill="none" stroke={isDark ? "#ffd053" : "#fc9f62"} strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5, 15" className="animate-[dash_4s_linear_infinite]" style={{ strokeDashoffset: -20 }} />
 
             {/* Isometric Cubes (Buildings/Warehouses) */}
             {/* Building 1 - Left background block */}
@@ -1078,8 +1296,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
               <path d="M 35,17.5 L 70,35 L 70,87.5 L 35,70 Z" fill={isDark ? "#1a1b1f" : "#94a3b8"} />
               <path d="M 0,35 L 35,17.5 L 70,35 L 35,52.5 Z" fill={isDark ? "#2d3039" : "#f1f5f9"} />
               {/* glow entrance door on side */}
-              <path d="M 10,65 L 25,57.5 L 25,80 L 10,87 Z" fill={isDark ? "#c5f82a" : "#fecaca"} opacity="0.3" />
-              <path d="M 13,67 L 22,62.5 L 22,78 L 13,82 Z" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.9" />
+              <path d="M 10,65 L 25,57.5 L 25,80 L 10,87 Z" fill={isDark ? "#ffd053" : "#ffebeb"} opacity="0.3" />
+              <path d="M 13,67 L 22,62.5 L 22,78 L 13,82 Z" fill={isDark ? "#ffd053" : "#fc9f62"} opacity="0.9" />
             </g>
 
             {/* Building 3 - Front small block layout */}
@@ -1096,15 +1314,176 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
             </g>
 
             {/* Marker circles and Pulsing Location dots */}
-            <circle cx="90" cy="200" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
-            <circle cx="90" cy="200" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
+            <circle cx="90" cy="200" r="12" fill={isDark ? "#ffd053" : "#fc9f62"} opacity="0.15" className="animate-pulse" />
+            <circle cx="90" cy="200" r="5" fill={isDark ? "#ffd053" : "#fc9f62"} />
 
-            <circle cx="170" cy="120" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
-            <circle cx="170" cy="120" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
+            <circle cx="170" cy="120" r="12" fill={isDark ? "#ffd053" : "#fc9f62"} opacity="0.15" className="animate-pulse" />
+            <circle cx="170" cy="120" r="5" fill={isDark ? "#ffd053" : "#fc9f62"} />
 
-            <circle cx="280" cy="210" r="12" fill={isDark ? "#c5f82a" : "#f05a3e"} opacity="0.15" className="animate-pulse" />
-            <circle cx="280" cy="210" r="5" fill={isDark ? "#c5f82a" : "#f05a3e"} />
+            <circle cx="280" cy="210" r="12" fill={isDark ? "#ffd053" : "#fc9f62"} opacity="0.15" className="animate-pulse" />
+            <circle cx="280" cy="210" r="5" fill={isDark ? "#ffd053" : "#fc9f62"} />
           </svg>
+        </div>
+      </div>
+
+      {/* WAREHOUSE MANAGER PANEL */}
+      <div id="warehouse-location-manager-panel" className={`p-6 border rounded-[24px] flex flex-col transition-all duration-300 ${
+        isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-[#eef0f3] shadow-[0_8px_30px_rgba(0,0,0,0.01)]"
+      }`}>
+        <div className={`flex flex-col sm:flex-row sm:items-center justify-between mb-5 border-b pb-3 gap-2 ${
+          isDark ? "border-[#25272c]" : "border-slate-100"
+        }`}>
+          <div>
+            <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <MapPin className={`w-4.5 h-4.5 ${isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]'}`} />
+              Warehouse & Location Administration
+            </h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+              Rename existing warehouses or register additional storage depots and sites in real-time
+            </p>
+          </div>
+          <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border shrink-0 sm:self-center ${
+            isDark 
+              ? "bg-[#ffd053]/10 border-[#ffd053]/30 text-[#ffd053]" 
+              : "bg-orange-50 border-orange-200 text-[#fc9f62]"
+          }`}>
+            {warehouses.length} ACTIVE DEPOT SITES
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left 2 Cols: Warehouse List & Renamer */}
+          <div className="lg:col-span-2 space-y-3">
+            <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+              Existing Depots
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {warehouses.map((wh) => {
+                const isEditing = editingWarehouseId === wh.id;
+                const matchingStockCount = inventory.reduce((acc, curr) => acc + (Number(curr[wh.key]) || 0), 0);
+                
+                return (
+                  <div 
+                    key={wh.id}
+                    className={`p-4 border rounded-2xl flex flex-col justify-between transition-all relative overflow-hidden ${
+                      isDark 
+                        ? "bg-[#111215] border-[#24262b] hover:border-[#ffd053]/20" 
+                        : "bg-slate-50 border-slate-100 hover:border-[#fc9f62]/20 shadow-3xs"
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-2xl">{wh.icon || '🏢'}</span>
+                        <div className="flex items-center gap-1.5">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <button 
+                                onClick={() => handleSaveRename(wh.id, wh.name)}
+                                className="px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded bg-emerald-600 text-white hover:bg-emerald-700 transition"
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => {
+                                  setEditingWarehouseId(null);
+                                  setEditingWarehouseName('');
+                                }}
+                                className="px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded bg-rose-600 text-white hover:bg-rose-700 transition"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setEditingWarehouseId(wh.id);
+                                setEditingWarehouseName(wh.name);
+                              }}
+                              className={`p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-zinc-850 flex items-center justify-center transition`}
+                              title="Rename warehouse"
+                            >
+                              <Sliders className="w-3.5 h-3.5 text-slate-400 hover:text-blue-500" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editingWarehouseName}
+                          onChange={(e) => setEditingWarehouseName(e.target.value)}
+                          className="w-full bg-slate-100 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 rounded px-2.5 py-1.5 text-xs font-bold text-slate-850 dark:text-white outline-none"
+                          placeholder="depot name..."
+                          autoFocus
+                        />
+                      ) : (
+                        <p className={`text-xs font-black uppercase tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                          {wh.name}
+                        </p>
+                      )}
+                      
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-2.5 flex items-center gap-1.5">
+                        <span className={`inline-block w-2 h-2 rounded-full ${matchingStockCount > 0 ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                        {matchingStockCount.toLocaleString()} Pcs currently on-hand
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right Col: Add New Location Depot */}
+          <div className={`p-5 rounded-2xl border ${
+            isDark ? "bg-[#111215]/60 border-[#24262b]" : "bg-slate-50 border-slate-100 shadow-3xs"
+          } flex flex-col justify-between`}>
+            <div className="space-y-3">
+              <h4 className={`text-xs font-black uppercase tracking-wider ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+                Add New Location
+              </h4>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">New Depot Name</label>
+                <input 
+                  type="text"
+                  value={newWarehouseName}
+                  onChange={(e) => setNewWarehouseName(e.target.value)}
+                  placeholder="e.g. West Coast Storage" 
+                  className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded px-3 py-2 text-xs font-bold focus:bg-white dark:focus:bg-zinc-850 outline-none text-slate-800 dark:text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block font-bold">Depot Icon / Type</label>
+                <div className="flex items-center gap-2">
+                  {['🏢', '🏫', '💻', '🏬', '🏭', '🏠'].map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setSelectedWarehouseIcon(emoji)}
+                      className={`w-9 h-9 text-lg rounded-xl flex items-center justify-center border transition-all ${
+                        selectedWarehouseIcon === emoji 
+                          ? "bg-amber-100 border-amber-400 scale-110" 
+                          : isDark ? "bg-[#1a1b1f] border-zinc-700 hover:bg-zinc-800" : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button 
+              onClick={() => {
+                handleAddWarehouse(newWarehouseName, selectedWarehouseIcon);
+                setNewWarehouseName('');
+              }}
+              className={`w-full py-2.5 px-4 font-bold text-[10px] uppercase tracking-widest mt-4 rounded-xl transition-all active:scale-95 cursor-pointer ${
+                isDark ? "bg-[#ffd053] text-black hover:bg-[#ebbe46]" : "bg-slate-900 text-white hover:bg-slate-800"
+              }`}
+            >
+              Establish Depot
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1117,15 +1496,15 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
         }`}>
           <div>
             <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <ClipboardList className={`w-4.5 h-4.5 ${isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]'}`} />
+              <ClipboardList className={`w-4.5 h-4.5 ${isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]'}`} />
               Sales Pending Confirmation
             </h3>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Pending approval order card deck</p>
           </div>
           <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border shrink-0 sm:self-center ${
             isDark 
-              ? "bg-[#c5f82a]/10 border-[#c5f82a]/30 text-[#c5f82a]" 
-              : "bg-orange-50 border-orange-200 text-[#f05a3e]"
+              ? "bg-[#ffd053]/10 border-[#ffd053]/30 text-[#ffd053]" 
+              : "bg-orange-50 border-orange-200 text-[#fc9f62]"
           }`}>
             {statuses.filter(s => s.status === 'Reserve').length} ORDER CARDS WAITING
           </span>
@@ -1142,23 +1521,23 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                 key={`pending-card-${item.id || idx}`} 
                 className={`p-5 border rounded-2xl flex flex-col justify-between transition-all group relative overflow-hidden ${
                   isDark 
-                    ? "bg-[#111215] border-[#24262b] hover:border-[#c5f82a]/30" 
-                    : "bg-slate-50 border-slate-100 hover:border-[#f05a3e]/30 shadow-3xs"
+                    ? "bg-[#111215] border-[#24262b] hover:border-[#ffd053]/30" 
+                    : "bg-slate-50 border-slate-100 hover:border-[#fc9f62]/30 shadow-3xs"
                 }`}
               >
                 <div className={`absolute top-0 right-0 w-16 h-16 rounded-bl-full pointer-events-none flex items-center justify-center ${
-                  isDark ? "bg-[#c5f82a]/5" : "bg-[#f05a3e]/5"
+                  isDark ? "bg-[#ffd053]/5" : "bg-[#fc9f62]/5"
                 }`}>
                   <span className={`text-[8px] font-bold absolute top-2.5 right-3.5 uppercase ${
-                    isDark ? "text-[#c5f82a]" : "text-[#f05a3e]"
+                    isDark ? "text-[#ffd053]" : "text-[#fc9f62]"
                   }`}>Deck</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 mb-3">
                     <span className={`font-mono text-xs font-black px-2.5 py-0.5 rounded-lg border shadow-3xs ${
                       isDark 
-                        ? "bg-[#1c1d21] border-[#25272c] text-white group-hover:bg-[#c5f82a]/10 group-hover:border-[#c5f82a]/20" 
-                        : "bg-white border-slate-200 text-slate-700 group-hover:bg-[#f05a3e]/5 group-hover:border-[#f05a3e]/20"
+                        ? "bg-[#1c1d21] border-[#25272c] text-white group-hover:bg-[#ffd053]/10 group-hover:border-[#ffd053]/20" 
+                        : "bg-white border-slate-200 text-slate-700 group-hover:bg-[#fc9f62]/5 group-hover:border-[#fc9f62]/20"
                     }`}>
                       {item.order || 'ORD-UNKNOWN'}
                     </span>
@@ -1183,8 +1562,8 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                   onClick={() => handleConfirmReservation(item)}
                   className={`w-full py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer ${
                     isDark 
-                      ? "bg-[#c5f82a] hover:bg-[#b0df20] text-black shadow-md shadow-[#c5f82a]/10" 
-                      : "bg-[#f05a3e] hover:bg-[#d44327] text-white shadow-md shadow-[#f05a3e]/10"
+                      ? "bg-[#ffd053] hover:bg-[#ebbe46] text-black shadow-md shadow-[#ffd053]/10" 
+                      : "bg-[#fc9f62] hover:bg-[#e38344] text-white shadow-md shadow-[#fc9f62]/10"
                   }`}
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1215,25 +1594,35 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
           <div className="p-6 border-1.5 border-[#111215] dark:border-zinc-200 rounded-[24px] relative overflow-hidden flex flex-col justify-between h-44 pastel-lavender shadow-[3.5px_3.5px_0px_0px_var(--neo-shadow)] hover:translate-y-[-1.5px] hover:shadow-[5px_5px_0px_0px_var(--neo-shadow)] transition-all duration-200">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
-                <ClipboardList className="w-3.5 h-3.5 text-[#f05a3e]" />
+                <ClipboardList className="w-3.5 h-3.5 text-[#fc9f62]" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#0c0101]">Sales to Confirm</span>
+              <span 
+                className="text-[10px] font-black uppercase tracking-wider text-[#0c0101]"
+                style={isDark ? { color: '#f1e7e7' } : undefined}
+              >
+                Sales to Confirm
+              </span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
               <span className={`text-5xl font-display font-black tracking-tight ${isDark ? "text-white" : "text-black"}`}>
                 {statuses.filter(s => s.status === 'Reserve').length}
               </span>
-              <span className="text-[10px] font-black uppercase tracking-widest font-mono text-[#f05a3e]">Pending</span>
+              <span 
+                className="text-[10px] font-black uppercase tracking-widest font-mono text-[#fc9f62]"
+                style={isDark ? { color: '#ece6e4' } : undefined}
+              >
+                Pending
+              </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-[#111215]/10 pt-3">
-              <span className="text-[10px] font-bold flex items-center gap-1 text-[#f05a3e]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#f05a3e] animate-pulse" />
+              <span className="text-[10px] font-bold flex items-center gap-1 text-[#fc9f62]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#fc9f62] animate-pulse" />
                 Requires approval
               </span>
               <div className="h-10 w-24 opacity-80">
-                <svg viewBox="0 0 100 40" className="w-full h-full text-[#f05a3e]">
+                <svg viewBox="0 0 100 40" className="w-full h-full text-[#fc9f62]">
                   <path d="M 0,35 Q 20,40 40,15 T 70,25 T 100,5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                   <circle cx="100" cy="5" r="3.5" fill="currentColor" />
                 </svg>
@@ -1247,7 +1636,12 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
               <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
                 <Bookmark className="w-3.5 h-3.5 text-[#11c250]" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#0f0101]">Active holds</span>
+              <span 
+                className="text-[10px] font-black uppercase tracking-wider text-[#0f0101]"
+                style={isDark ? { color: '#f1e8e8' } : undefined}
+              >
+                Active holds
+              </span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
@@ -1277,7 +1671,12 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
               <div className="w-6 h-6 rounded-full flex items-center justify-center border border-[#111215]/20 bg-white/50">
                 <ClipboardList className="w-3.5 h-3.5 text-purple-600" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#070000]">Logs Audit Entries</span>
+              <span 
+                className="text-[10px] font-black uppercase tracking-wider text-[#070000]"
+                style={isDark ? { color: '#f1e9e9' } : undefined}
+              >
+                Logs Audit Entries
+              </span>
             </div>
             
             <div className="mt-2 flex items-baseline gap-1.5">
@@ -1314,7 +1713,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-6 mb-6 gap-4 border-slate-200 dark:border-zinc-800/30">
             <div>
               <h3 className={`text-base font-black uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-white" : "text-slate-800"}`}>
-                <Package className="w-5 h-5 text-[#f05a3e]" />
+                <Package className="w-5 h-5 text-[#fc9f62]" />
                 Total Inventory Stock
               </h3>
               <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isDark ? "text-zinc-400" : "text-slate-400"}`}>
@@ -1324,7 +1723,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
             
             {/* Styled exactly identical to the dark grey container shown in image 1, but with deep charcoal for superb high-contrast legibility */}
             <div className="flex items-baseline gap-2.5 bg-[#1b1c1e] px-6 py-2.5 rounded-[18px] shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),_0_4px_12px_rgba(0,0,0,0.15)] border border-[#2a2b2f] shrink-0">
-              <span className="text-[#ff5232] font-display text-3xl font-black tracking-tight leading-none filter drop-shadow-[0_1px_2px_rgba(255,82,50,0.15)]">
+              <span className="text-[#fc9f62] font-display text-3xl font-black tracking-tight leading-none filter drop-shadow-[0_1px_2px_rgba(252,159,98,0.15)]">
                 {inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0).toLocaleString()}
               </span>
               <span className="text-[#9eaab6] text-[10px] font-black uppercase tracking-wide font-mono leading-none">
@@ -1340,42 +1739,25 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                 Warehouse Location Distribution
               </h4>
               <div className="space-y-4">
-                {[
-                  { 
-                    name: 'Old Warehouse', 
-                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyOld) || 0), 0),
-                    icon: '🏫',
-                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
-                  },
-                  { 
-                    name: 'New Warehouse', 
-                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyNew) || 0), 0),
-                    icon: '🏢',
-                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
-                  },
-                  { 
-                    name: 'Office', 
-                    qty: inventory.reduce((acc, curr) => acc + (Number(curr.qtyOffice) || 0), 0),
-                    icon: '💻',
-                    color: isDark ? 'bg-[#c5f82a]' : 'bg-[#f05a3e]'
-                  }
-                ].map((site) => {
+                {warehouses.map((w) => {
+                  const qty = inventory.reduce((acc, curr) => acc + (Number(curr[w.key]) || 0), 0);
+                  const color = isDark ? 'bg-[#ffd053]' : 'bg-[#fc9f62]';
                   const total = inventory.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) || 1;
-                  const percent = Math.min(100, Math.round((site.qty / total) * 100));
+                  const percent = Math.min(100, Math.round((qty / total) * 100));
                   return (
-                    <div key={site.name} className="space-y-1.5">
+                    <div key={w.id} className="space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
                         <span className={`font-bold flex items-center gap-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
-                          <span>{site.icon}</span>
-                          <span>{site.name}</span>
+                          <span>{w.icon || '🏢'}</span>
+                          <span>{w.name}</span>
                         </span>
                         <span className={`font-mono font-black ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                          {site.qty.toLocaleString()} Pcs <span className="text-[10px] text-slate-400">({percent}%)</span>
+                          {qty.toLocaleString()} Pcs <span className="text-[10px] text-slate-400">({percent}%)</span>
                         </span>
                       </div>
                       <div className={`h-2.5 rounded-full overflow-hidden ${isDark ? 'bg-zinc-800' : 'bg-slate-100'}`}>
                         <div 
-                          className={`h-full rounded-full transition-all duration-500 ${site.color}`}
+                          className={`h-full rounded-full transition-all duration-500 ${color}`}
                           style={{ width: `${percent}%` }}
                         />
                       </div>
@@ -1403,7 +1785,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className={`w-6 h-6 rounded-lg font-mono text-[10px] font-black flex items-center justify-center border shadow-3xs ${
-                          isDark ? 'bg-zinc-800 border-zinc-700 text-[#c5f82a]' : 'bg-white border-slate-200 text-[#f05a3e]'
+                          isDark ? 'bg-zinc-800 border-zinc-700 text-[#ffd053]' : 'bg-white border-slate-200 text-[#fc9f62]'
                         }`}>
                           #{index + 1}
                         </span>
@@ -1417,7 +1799,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                         </div>
                       </div>
                       <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border uppercase tracking-wider shrink-0 ${
-                        isDark ? "bg-[#c5f82a]/10 text-[#c5f82a] border-[#c5f82a]/20" : "bg-orange-50 text-[#f05a3e] border-orange-100"
+                        isDark ? "bg-[#ffd053]/10 text-[#ffd053] border-[#ffd053]/20" : "bg-orange-50 text-[#fc9f62] border-orange-100"
                       }`}>
                         {item.qty || 0} Pcs
                       </span>
@@ -1529,9 +1911,9 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       onChange={e => setNewItem({...newItem, location: e.target.value})}
                       className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-blue-100 outline-none text-slate-800"
                     >
-                      <option>Old warehouse</option>
-                      <option>New warehouse</option>
-                      <option>Office</option>
+                      {warehouses.map(w => (
+                        <option key={`opt-${w.id}`}>{w.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1575,44 +1957,24 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                     value={newItemDetails.name}
                     onChange={e => setNewItemDetails({...newItemDetails, name: e.target.value})}
                     placeholder="e.g. Bambu Lab X1-Carbon 3D Printer" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#fc9f62]/10 outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Qty Old WH</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={newItemDetails.qtyOld}
-                      onChange={e => setNewItemDetails({...newItemDetails, qtyOld: e.target.value})}
-                      placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Qty New WH</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={newItemDetails.qtyNew}
-                      onChange={e => setNewItemDetails({...newItemDetails, qtyNew: e.target.value})}
-                      placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Qty Office</label>
-                    <input 
-                      type="number" 
-                      min="0"
-                      value={newItemDetails.qtyOffice}
-                      onChange={e => setNewItemDetails({...newItemDetails, qtyOffice: e.target.value})}
-                      placeholder="0" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
-                    />
-                  </div>
+                  {warehouses.map(w => (
+                    <div key={`input-${w.id}`} className="space-y-1.5 animate-in fade-in zoom-in duration-200">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block truncate">Qty {w.name}</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={newWarehouseQuantities[w.key] ?? '0'}
+                        onChange={e => setNewWarehouseQuantities({...newWarehouseQuantities, [w.key]: e.target.value})}
+                        placeholder="0" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#fc9f62]/10 outline-none text-slate-850"
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1635,7 +1997,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       value={newItemDetails.barcode}
                       onChange={e => setNewItemDetails({...newItemDetails, barcode: e.target.value})}
                       placeholder="e.g. 506085189" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2 text-sm font-bold focus:bg-white focus:ring-1 focus:ring-[#fc9f62]/10 outline-none"
                     />
                   </div>
                 </div>
@@ -1647,11 +2009,11 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                     value={newItemDetails.imgUrl}
                     onChange={e => setNewItemDetails({...newItemDetails, imgUrl: e.target.value})}
                     placeholder="Leave blank for automatic robotics/STEM asset assignment" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-[#f05a3e]/10 outline-none"
+                    className="w-full bg-slate-50 border border-slate-200 rounded px-4 py-2.5 text-xs font-bold focus:bg-white focus:ring-1 focus:ring-[#fc9f62]/10 outline-none"
                   />
                 </div>
 
-                <button type="submit" className="w-full py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded font-bold text-[11px] uppercase tracking-widest mt-6 shadow-lg active:scale-95 transition-all">
+                <button type="submit" className="w-full py-3 bg-[#fc9f62] hover:bg-[#e38344] text-white rounded font-bold text-[11px] uppercase tracking-widest mt-6 shadow-lg active:scale-95 transition-all">
                   Register Catalog SKU & Quantities
                 </button>
               </form>
@@ -1742,7 +2104,7 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       <p className="text-slate-500 font-mono text-sm mt-1">{scannedCode}</p>
                     </div>
                     <div className="flex flex-col gap-2">
-                       <button className="py-3 bg-[#f05a3e] hover:bg-[#d44327] text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">
+                       <button className="py-3 bg-[#fc9f62] hover:bg-[#e38344] text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">
                           Increment Stock (+1)
                        </button>
                        <button onClick={startScanner} className="py-3 bg-slate-900 hover:bg-slate-850 text-white rounded font-bold text-[11px] uppercase tracking-widest transition-all">
@@ -1895,9 +2257,9 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       onChange={e => setAdjLocation(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2.5 text-xs font-bold outline-none cursor-pointer"
                     >
-                      <option>Old warehouse</option>
-                      <option>New warehouse</option>
-                      <option>Office</option>
+                      {warehouses.map(w => (
+                        <option key={`adj-opt-${w.id}`}>{w.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -2069,40 +2431,27 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                     if (!activeItem) return null;
 
                     const itemLoans = statuses.filter(s => s.item && s.item.toLowerCase() === activeItem.name.toLowerCase() && (s.status === 'Loan' || s.status === 'Rent'));
-                    const loanedQty = itemLoans.reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const oldWhLoaned = itemLoans.filter(s => s.where === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const newWhLoaned = itemLoans.filter(s => s.where === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const officeLoaned = itemLoans.filter(s => s.where === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
-
                     const itemReservations = reservations.filter(r => r.itemId === activeItem.id && r.status === 'Packing');
-                    const reservedQty = itemReservations.reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const oldWhReserved = itemReservations.filter(r => r.location === 'Old warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const newWhReserved = itemReservations.filter(r => r.location === 'New warehouse').reduce((acc, curr) => acc + (curr.qty || 0), 0);
-                    const officeReserved = itemReservations.filter(r => r.location === 'Office').reduce((acc, curr) => acc + (curr.qty || 0), 0);
 
+                    const loanedQty = itemLoans.reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                    const reservedQty = itemReservations.reduce((acc, curr) => acc + (curr.qty || 0), 0);
                     const availableQtyVal = Math.max(0, (activeItem.qty || 0) - loanedQty - reservedQty);
 
-                    let displayQtyOldVal = Math.max(0, (activeItem.qtyOld || 0) - oldWhLoaned - oldWhReserved);
-                    let displayQtyNewVal = Math.max(0, (activeItem.qtyNew || 0) - newWhLoaned - newWhReserved);
-                    let displayQtyOfficeVal = Math.max(0, (activeItem.qtyOffice || 0) - officeLoaned - officeReserved);
+                    const breakdowns: Record<string, number> = {};
+                    warehouses.forEach(w => {
+                      const lValue = itemLoans.filter(s => s.where === w.name).reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                      const rValue = itemReservations.filter(r => r.location === w.name).reduce((acc, curr) => acc + (curr.qty || 0), 0);
+                      breakdowns[w.key] = Math.max(0, (activeItem[w.key] || 0) - lValue - rValue);
+                    });
 
-                    const sumLocsVal = displayQtyOldVal + displayQtyNewVal + displayQtyOfficeVal;
+                    let sumLocsVal = Object.values(breakdowns).reduce((a, b) => a + b, 0);
                     if (sumLocsVal > availableQtyVal) {
                       let gapVal = sumLocsVal - availableQtyVal;
-                      const fromNewVal = Math.min(displayQtyNewVal, gapVal);
-                      displayQtyNewVal -= fromNewVal;
-                      gapVal -= fromNewVal;
-
-                      if (gapVal > 0) {
-                        const fromOldVal = Math.min(displayQtyOldVal, gapVal);
-                        displayQtyOldVal -= fromOldVal;
-                        gapVal -= fromOldVal;
-                      }
-
-                      if (gapVal > 0) {
-                        const fromOfficeVal = Math.min(displayQtyOfficeVal, gapVal);
-                        displayQtyOfficeVal -= fromOfficeVal;
-                        gapVal -= fromOfficeVal;
+                      for (const w of warehouses) {
+                        if (gapVal <= 0) break;
+                        const subAmt = Math.min(breakdowns[w.key], gapVal);
+                        breakdowns[w.key] -= subAmt;
+                        gapVal -= subAmt;
                       }
                     }
 
@@ -2110,11 +2459,13 @@ export default function Dashboard({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       <select 
                         value={holdLocation}
                         onChange={e => setHoldLocation(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2.5 text-xs font-bold outline-none cursor-pointer"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2.5 text-xs font-bold outline-none cursor-pointer text-slate-800 focus:bg-white"
                       >
-                        <option value="Old warehouse">Old warehouse (Available: {displayQtyOldVal})</option>
-                        <option value="New warehouse">New warehouse (Available: {displayQtyNewVal})</option>
-                        <option value="Office">Office (Available: {displayQtyOfficeVal})</option>
+                        {warehouses.map(w => (
+                          <option key={`hold-opt-${w.id}`} value={w.name}>
+                            {w.name} (Available: {breakdowns[w.key] || 0})
+                          </option>
+                        ))}
                       </select>
                     );
                   })()}

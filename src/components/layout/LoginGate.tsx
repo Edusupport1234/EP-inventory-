@@ -65,27 +65,27 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#111215] flex items-center justify-center p-4 transition-colors duration-300">
       {/* Decorative subtle ambient background shapes */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-orange-100/40 blur-3xl" />
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-orange-100/30 blur-3xl" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-orange-100/40 dark:bg-orange-950/10 blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-orange-100/30 dark:bg-orange-950/10 blur-3xl animate-pulse" />
       </div>
 
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white border border-slate-200 rounded-[24px] shadow-xl overflow-hidden relative z-10 flex flex-col p-8 md:p-10"
+        className="w-full max-w-md bg-white dark:bg-[#1c1d21] border border-slate-200 dark:border-[#25272c] rounded-[24px] shadow-xl dark:shadow-none overflow-hidden relative z-10 flex flex-col p-8 md:p-10 transition-colors duration-300"
       >
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-12 h-12 bg-[#f05a3e] rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4 animate-bounce-short">
+          <div className="w-12 h-12 bg-[#fc9f62] rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4 animate-bounce-short">
             <div className="w-5 h-5 border-[3px] border-white rotate-45" />
           </div>
-          <h2 className="text-xl font-bold font-sans tracking-tight text-slate-800">
-            EP <span className="text-[#f05a3e]">INVENTORY</span>
+          <h2 className="text-xl font-bold font-sans tracking-tight text-slate-800 dark:text-zinc-100">
+            EP <span className="text-[#fc9f62] dark:text-[#ffd053]">INVENTORY</span>
           </h2>
-          <p className="text-xs text-slate-500 font-medium mt-1 uppercase tracking-widest">
+          <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium mt-1 uppercase tracking-widest">
             Cloud Warehouse Terminal
           </p>
         </div>
@@ -95,21 +95,21 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="mb-5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl p-3.5 flex items-start gap-2.5"
+            className="mb-5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/30 text-rose-700 dark:text-rose-400 text-xs rounded-xl p-3.5 flex items-start gap-2.5"
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <p className="leading-relaxed font-medium">{error}</p>
+            <p className="leading-relaxed font-semibold">{error}</p>
           </motion.div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Username Field */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
               Username
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500">
                 <User className="w-4 h-4" />
               </span>
               <input
@@ -118,18 +118,18 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-[#f05a3e] focus:ring-1 focus:ring-[#f05a3e] text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#111215]/50 border border-slate-200 dark:border-[#25272c] rounded-xl outline-none focus:bg-white dark:focus:bg-[#1c1d21] focus:border-[#fc9f62] dark:focus:border-[#ffd053] text-slate-700 dark:text-zinc-100 font-medium text-sm transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-650"
               />
             </div>
           </div>
 
           {/* Password Field */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">
+            <label className="text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider block">
               Password
             </label>
             <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500">
                 <Lock className="w-4 h-4" />
               </span>
               <input
@@ -138,7 +138,7 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter key passcode"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-[#f05a3e] focus:ring-1 focus:ring-[#f05a3e] text-slate-700 font-medium text-sm transition-all placeholder:text-slate-400"
+                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-[#111215]/50 border border-slate-200 dark:border-[#25272c] rounded-xl outline-none focus:bg-white dark:focus:bg-[#1c1d21] focus:border-[#fc9f62] dark:focus:border-[#ffd053] text-slate-700 dark:text-zinc-100 font-medium text-sm transition-all placeholder:text-slate-400 dark:placeholder:text-zinc-650"
               />
             </div>
           </div>
@@ -147,11 +147,11 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3.5 px-4 bg-[#f05a3e] hover:bg-[#d44327] disabled:bg-[#f05a3e]/50 text-white font-bold text-sm tracking-wide rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3.5 px-4 bg-[#fc9f62] dark:bg-[#ffd053] hover:bg-[#eb8c47] dark:hover:bg-[#ebbe46] disabled:bg-[#fc9f62]/50 dark:disabled:bg-[#ffd053]/50 text-white dark:text-zinc-950 font-extrabold text-xs uppercase tracking-widest rounded-xl shadow-md cursor-pointer transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-2"
           >
             {isLoading ? (
               <>
-                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-4 w-4 text-white dark:text-zinc-950" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
@@ -167,8 +167,8 @@ export default function LoginGate({ onLoginSuccess }: LoginGateProps) {
         </form>
 
         {/* Footer info message */}
-        <div className="mt-8 border-t border-slate-100 pt-5 text-center">
-          <p className="text-[10px] text-slate-400 font-semibold leading-relaxed uppercase tracking-wider">
+        <div className="mt-8 border-t border-slate-100 dark:border-[#25272c] pt-5 text-center">
+          <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold leading-relaxed uppercase tracking-widest">
             Enterprise Education Network Portal • EPEDU Auth
           </p>
         </div>

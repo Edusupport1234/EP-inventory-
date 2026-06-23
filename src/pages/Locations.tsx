@@ -1011,6 +1011,7 @@ const WarehouseScene = ({
 };
 
 export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState<'3d' | 'labels'>('3d');
   const [visualZones, setVisualZones] = useState<ZoneInfo[]>(PHYSICAL_ZONES);
   const [selectedRack, setSelectedRack] = useState<RackData | null>(null);
@@ -1694,7 +1695,8 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
     if (checkViewerAndAlert('Decommission Rack Structure')) {
       return;
     }
-    if (!selectedRack) return;
+    const targetRack = racks.find(r => r.id === id);
+    if (!targetRack) return;
     try {
       const placedItems = inventory.filter(item => item.rackId === id);
       const placedRes = reservations.filter(res => res.rackId === id);
@@ -1725,13 +1727,15 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
       await batch.commit();
 
       triggerUndoableAction('delete_rack', { 
-        rack: selectedRack, 
+        rack: targetRack, 
         items: placedItems, 
         reservations: placedRes 
-      }, `Deleted physical structure: ${selectedRack.name}`);
+      }, `Deleted physical structure: ${targetRack.name}`);
 
-      setSelectedRack(null);
-      setSelectedLevelIndex(null);
+      if (selectedRack?.id === id) {
+        setSelectedRack(null);
+        setSelectedLevelIndex(null);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'racks');
     }
@@ -1966,7 +1970,12 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
       >
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
           <div>
-            <h1 className={cn("text-xl font-bold tracking-tight", isFullscreen ? "text-slate-100" : "text-slate-800")}>Location Matrix</h1>
+            <h1 
+              className={cn("text-xl font-bold tracking-tight", isFullscreen ? "text-slate-100" : "")}
+              style={isFullscreen ? undefined : { color: isDark ? '#f5f5f6' : '#00000c' }}
+            >
+              Location Matrix
+            </h1>
             <p className={cn("text-[11px] uppercase tracking-wider font-semibold", isFullscreen ? "text-slate-400" : "text-slate-500")}>Warehouse Floor Map & Configuration</p>
           </div>
           <div className="flex gap-2">
@@ -2390,6 +2399,19 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
                       className="w-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 text-[8.5px] font-black uppercase tracking-widest py-1 px-2 rounded-lg transition-all active:scale-95 cursor-pointer"
                     >
                       Reset position to center (0, 0)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to permanently decommission and delete rack "${selectedRack.name}"?`)) {
+                          deleteRack(selectedRack.id);
+                        }
+                      }}
+                      className="w-full bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-[8.5px] font-black uppercase tracking-widest py-1 px-2 rounded-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Decommission Rack</span>
                     </button>
                   </div>
                 </div>
@@ -3089,6 +3111,22 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
                   className="w-full accent-[#f05a3e] cursor-ew-resize h-1 bg-slate-100 rounded-lg appearance-none"
                 />
               </div>
+
+              {/* Decommission Rack Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to permanently decommission and delete rack "${selectedRack.name}"? This will also clear all items located on this rack.`)) {
+                      deleteRack(selectedRack.id);
+                    }
+                  }}
+                  className="w-full py-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-105 text-rose-700 text-[10px] font-extrabold uppercase tracking-widest rounded-xl transition-all shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Delete Rack Structure</span>
+                </button>
+              </div>
             </div>
 
             {/* Informational keyboard positioning tip */}
@@ -3148,12 +3186,15 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
                   <button
                     type="button"
                     onClick={() => {
-                      deleteSketchItem(selectedSketchItem.id);
-                      setSelectedSketchItem(null);
+                      if (confirm(`Are you sure you want to permanently delete this element "${selectedSketchItem.name || 'Architectural Element'}"?`)) {
+                        deleteSketchItem(selectedSketchItem.id);
+                        setSelectedSketchItem(null);
+                      }
                     }}
-                    className="text-[9px] font-extrabold text-rose-500 hover:text-rose-600 cursor-pointer"
+                    className="text-[9px] font-extrabold text-rose-600 hover:text-rose-700 cursor-pointer bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-lg transition-all flex items-center gap-1"
                   >
-                    Delete Item
+                    <Trash2 className="w-2.5 h-2.5" />
+                    <span>Delete</span>
                   </button>
                 </div>
 
@@ -3336,9 +3377,119 @@ export default function Locations({ theme = 'dark' }: { theme?: 'light' | 'dark'
                   </button>
                 </div>
 
-                <div className="bg-slate-50 border border-dashed border-slate-200 p-4 rounded-xl text-center mt-3">
-                  <p className="text-[10px] text-slate-400 italic">No custom element active.</p>
-                  <p className="text-[9.5px] text-slate-455 mt-1 leading-relaxed font-semibold uppercase tracking-wide">Click "+ Add Wall", "+ Add Window" or "+ Add Door" to design custom warehouse walls and map divisions!</p>
+                {/* Placed Objects & Structures Directory */}
+                <div className="space-y-3.5 pt-4 border-t border-slate-100">
+                  <h4 className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                    <Layout className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span>Placed Objects & Structures ({racks.length + sketchItems.length})</span>
+                  </h4>
+                  {racks.length === 0 && sketchItems.length === 0 ? (
+                    <div className="bg-slate-50 border border-dashed border-slate-200 p-4 rounded-xl text-center">
+                      <p className="text-[10px] text-slate-400 italic">No physical structures placed yet.</p>
+                      <p className="text-[9px] text-slate-455 mt-1 leading-normal uppercase">Place your first structure or fixture above!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {/* List Racks */}
+                      {racks.map((rk) => {
+                        const zoneInfo = getZoneByZ(rk.position[2], visualZones);
+                        return (
+                          <div
+                            key={`list-rk-${rk.id}`}
+                            className="bg-slate-50 border border-slate-150 rounded-xl p-2.5 flex items-center justify-between text-left transition-all hover:bg-slate-100/50"
+                          >
+                            <div 
+                              onClick={() => {
+                                setSelectedRack(rk);
+                                setSelectedSketchItem(null);
+                              }}
+                              className="flex-1 min-w-0 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Warehouse className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                <span className="text-[11px] font-bold text-slate-700 truncate">{rk.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[8.5px] font-extrabold uppercase tracking-wider" style={{ color: zoneInfo.color }}>
+                                  {zoneInfo.lane}
+                                </span>
+                                <span className="text-[8px] font-mono font-bold text-slate-400">
+                                  ({rk.position[0].toFixed(1)}, {rk.position[2].toFixed(1)})
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to permanently delete rack "${rk.name}"?`)) {
+                                  deleteRack(rk.id);
+                                }
+                              }}
+                              className="p-1 px-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                              title="Delete structure"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {/* List Sketch Items */}
+                      {sketchItems.map((item) => {
+                        const labelsMap: Record<string, string> = {
+                          wall: 'Wall Segment',
+                          window: 'Glass Window',
+                          door: 'Access Door',
+                          toilet_bowl: 'Sanitary Toilet'
+                        };
+                        const iconsMap: Record<string, string> = {
+                          wall: '🧱',
+                          window: '🪟',
+                          door: '🚪',
+                          toilet_bowl: '🚽'
+                        };
+                        return (
+                          <div
+                            key={`list-sk-${item.id}`}
+                            className="bg-slate-50 border border-slate-150 rounded-xl p-2.5 flex items-center justify-between text-left transition-all hover:bg-slate-100/50"
+                          >
+                            <div 
+                              onClick={() => {
+                                setSelectedSketchItem(item);
+                                setSelectedRack(null);
+                              }}
+                              className="flex-1 min-w-0 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs shrink-0">{iconsMap[item.type] || '🧱'}</span>
+                                <span className="text-[11px] font-bold text-slate-700 truncate">{item.name || labelsMap[item.type]}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[8.5px] font-extrabold uppercase tracking-wider text-slate-400 font-bold">
+                                  {labelsMap[item.type] || 'Fixture'}
+                                </span>
+                                <span className="text-[8px] font-mono font-bold text-slate-400">
+                                  ({item.position[0].toFixed(1)}, {item.position[2].toFixed(1)})
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to permanently delete this ${labelsMap[item.type] || 'fixture'}?`)) {
+                                  deleteSketchItem(item.id);
+                                }
+                              }}
+                              className="p-1 px-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                              title="Delete element"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

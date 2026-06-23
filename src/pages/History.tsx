@@ -20,6 +20,7 @@ interface Adjustment {
 }
 
 export default function History({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [logs, setLogs] = useState<Adjustment[]>([]);
   const [search, setSearch] = useState('');
   const [user, setUser] = useState(auth.currentUser);
@@ -86,7 +87,10 @@ export default function History({ theme = 'dark' }: { theme?: 'light' | 'dark' }
     <div className="space-y-6 animate-in fade-in duration-500 pb-12">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 
+            className="text-xl font-extrabold tracking-tight flex items-center gap-2"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
             <HistoryIcon className="w-5 h-5 text-[#f05a3e] shrink-0" />
             Audit Ledger Hub
           </h1>

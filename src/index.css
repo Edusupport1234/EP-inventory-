@@ -4,8 +4,8 @@
 @theme {
   --font-sans: "Plus Jakarta Sans", "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Outfit", sans-serif;
-  --color-brand-primary: #f05a3e; /* Coral Accent */
-  --color-brand-secondary: #d44327;
+  --color-brand-primary: #ffd053; /* Warm Golden Mustard Accent */
+  --color-brand-secondary: #fc9f62; /* Pastel Apricot Orange */
   --color-surface-bg: var(--neo-bg);
 }
 
@@ -13,16 +13,16 @@
   --neo-border: #111215;
   --neo-card-bg: #ffffff;
   --neo-shadow: #111215;
-  --neo-bg: #f2f4f7;
+  --neo-bg: #e8e6e1; /* Aesthetic Warm Sand / Eggshell Background */
   --neo-text: #111215;
 }
 
 .dark {
-  --neo-border: #f4f4f5;
-  --neo-card-bg: #1c1d21;
-  --neo-shadow: #c5f82a;
-  --neo-bg: #111215;
-  --neo-text: #ffffff;
+  --neo-border: #24262b;
+  --neo-card-bg: #15161a; /* Rich Obsidian Dark Card Background */
+  --neo-shadow: #ffd053; /* Soft Gold Neon Shadow */
+  --neo-bg: #0f1013; /* Sleek Minimal Obsidian Black Background */
+  --neo-text: #e3e5e8;
 }
 
 @layer base {
@@ -50,8 +50,8 @@
   }
 
   .btn-primary {
-    background-color: #f05a3e;
-    color: white;
+    background-color: #ffd053; /* Golden Mustard from reference */
+    color: #111215;
     border: 1.5px solid var(--neo-border);
     font-weight: 800;
     font-size: 11px;
@@ -67,7 +67,7 @@
   .btn-primary:hover {
     transform: translate(-1px, -1px);
     box-shadow: 3.5px 3.5px 0px 0px var(--neo-border);
-    background-color: #d44327;
+    background-color: #fc9f62; /* Pastel Apricot Orange on hover */
   }
 
   .btn-primary:active {
@@ -135,31 +135,39 @@ textarea:focus {
 
 /* Pastel theme presets for dynamic decorative items */
 .pastel-lavender {
-  background-color: #e6e0fc;
+  background-color: #9b84fe;
+  color: #111215;
 }
 .pastel-mint {
-  background-color: #d8f6e0;
+  background-color: #4cd0a0;
+  color: #111215;
 }
 .pastel-peach {
-  background-color: #ffeae5;
+  background-color: #fc9f62;
+  color: #111215;
 }
 .pastel-yellow {
-  background-color: #fff6d2;
+  background-color: #ffd053;
+  color: #111215;
 }
 
 .dark .pastel-lavender {
-  background-color: rgba(230, 224, 252, 0.12);
+  background-color: rgba(155, 132, 254, 0.22);
   color: #c7ccff;
+  border-color: rgba(155, 132, 254, 0.4);
 }
 .dark .pastel-mint {
-  background-color: rgba(216, 246, 224, 0.12);
+  background-color: rgba(76, 208, 160, 0.22);
   color: #a7f3d0;
+  border-color: rgba(76, 208, 160, 0.4);
 }
 .dark .pastel-peach {
-  background-color: rgba(255, 234, 229, 0.12);
-  color: #fecaca;
+  background-color: rgba(252, 159, 98, 0.22);
+  color: #ffb785;
+  border-color: rgba(252, 159, 98, 0.4);
 }
 .dark .pastel-yellow {
-  background-color: rgba(255, 246, 210, 0.12);
-  color: #fef08a;
+  background-color: rgba(255, 208, 83, 0.22);
+  color: #ffe394;
+  border-color: rgba(255, 208, 83, 0.4);
 }

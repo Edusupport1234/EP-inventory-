@@ -23,7 +23,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('epedu_theme') as 'light' | 'dark') || 'light';
+    const saved = localStorage.getItem('epedu_theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
   });
 
   const toggleTheme = () => {
@@ -33,6 +38,36 @@ export default function App() {
       return next;
     });
   };
+
+  // Synchronize theme with the document root element
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.style.colorScheme = 'dark';
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.style.colorScheme = 'light';
+    }
+  }, [theme]);
+
+  // Dynamically adapt to system theme changes if no override is saved
+  useEffect(() => {
+    const savedPreference = localStorage.getItem('epedu_theme');
+    if (savedPreference) return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, []);
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('epedu_auth') === 'true';
@@ -128,11 +163,42 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen flex font-sans transition-colors duration-300 ${
+    <div className={`min-h-screen flex font-sans transition-all duration-300 relative overflow-hidden ${
       theme === 'dark' 
-        ? 'bg-[#111215] text-[#e3e5e8] dark' 
-        : 'bg-[#f8f7f4] text-slate-900'
+        ? 'bg-[#0f1013] text-[#e3e5e8] dark' 
+        : 'bg-[#faf9f5] text-slate-900'
     }`}>
+      {/* 🌟 Premium Fluid Mesh Ambient Glow Background & Grain Overlay (Both Light & Dark Modes) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 select-none">
+        {/* Peach & Amber Glow (Warm Sunlight - Top Center) */}
+        <div className={`absolute top-[-25%] left-[25%] w-[65vw] h-[65vh] rounded-full blur-[140px] pointer-events-none transition-all duration-1000 ${
+          theme === 'dark' ? 'bg-amber-500/10' : 'bg-[#ffe7cc]/75'
+        }`} />
+        
+        {/* Soft Lavender / Pink Glow (Warm Aura - Mid Right) */}
+        <div className={`absolute top-[35%] right-[-15%] w-[55vw] h-[55vh] rounded-full blur-[150px] pointer-events-none transition-all duration-1000 ${
+          theme === 'dark' ? 'bg-[#a78bfa]/12' : 'bg-[#f4e8ff]/85'
+        }`} />
+
+        {/* Sunny Glow (Center / Bottom Left) */}
+        <div className={`absolute bottom-[10%] left-[-10%] w-[50vw] h-[50vh] rounded-full blur-[130px] pointer-events-none transition-all duration-1000 ${
+          theme === 'dark' ? 'bg-yellow-600/5' : 'bg-[#fef9c3]/50'
+        }`} />
+
+        {/* Indigo-Violet High-Contrast Ambient Glow (Lower Right Highlight) */}
+        <div className={`absolute bottom-[-15%] right-[-5%] w-[60vw] h-[60vh] rounded-full blur-[150px] pointer-events-none transition-all duration-1000 ${
+          theme === 'dark' ? 'bg-[#4f46e5]/18' : 'bg-[#e0e7ff]/90'
+        }`} />
+
+        {/* Highlight Accent Glow (Center Bottom) */}
+        <div className={`absolute bottom-[5%] left-[30%] w-[40vw] h-[40vh] rounded-full blur-[120px] pointer-events-none transition-all duration-1000 ${
+          theme === 'dark' ? 'bg-[#ffd053]/5' : 'bg-[#f0fdf4]/50'
+        }`} />
+
+        {/* Fine Grain Texture Overlay */}
+        <div className={`absolute inset-0 opacity-[0.015] ${theme === 'dark' ? 'opacity-[0.025]' : ''} bg-[radial-gradient(#808080_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none`} />
+      </div>
+
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
@@ -142,7 +208,7 @@ export default function App() {
         theme={theme}
       />
       
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
+      <div className={`flex-1 flex flex-col transition-all duration-300 relative z-10 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
         {isViewer && (
           <div className="bg-amber-500 text-white text-[11px] font-black py-2.5 px-6 sticky top-0 z-40 flex items-center justify-center gap-2 uppercase tracking-widest shadow-sm border-b border-amber-600 select-none">
             <span>🔒 EP INVENTORY GAUNTLET — READ-ONLY MODE ACTIVE 🚫</span>

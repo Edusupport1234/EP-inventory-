@@ -15,8 +15,8 @@ export default function Navbar({ toggleSidebar, onLogout, theme = 'dark', onTogg
   const isDark = theme === 'dark';
 
   return (
-    <header className={`h-16 sticky top-0 z-30 flex items-center justify-between px-6 transition-colors duration-300 ${
-      isDark ? 'bg-[#111215] border-b border-[#24262b]' : 'bg-[#f4f5f7] border-b border-slate-200'
+    <header className={`h-16 sticky top-0 z-30 flex items-center justify-between px-6 transition-all duration-300 backdrop-blur-md ${
+      isDark ? 'bg-[#0f1013]/85 border-b border-[#24262b]' : 'bg-[#faf9f5]/85 border-b border-slate-200/60'
     }`}>
       <div className="flex items-center gap-4">
         <button 
@@ -30,10 +30,10 @@ export default function Navbar({ toggleSidebar, onLogout, theme = 'dark', onTogg
         
         <div className={`hidden md:flex items-center rounded-2xl px-3.5 py-2 w-80 border-1.5 transition-all duration-200 ${
           isDark 
-            ? 'bg-[#1c1d21] border-[#25272c] focus-within:border-[#c5f82a] shadow-[1px_1px_0px_0px_rgba(0,0,0,0.5)]' 
+            ? 'bg-[#1c1d21] border-[#25272c] focus-within:border-[#ffd053] shadow-[1px_1px_0px_0px_rgba(0,0,0,0.5)]' 
             : 'bg-white border-[#111215] focus-within:translate-y-[-1px] focus-within:shadow-[3px_3px_0px_0px_#111215] shadow-[2px_2px_0px_0px_#111215]'
         }`}>
-          <Search className={`w-4 h-4 mr-2.5 shrink-0 transition-colors duration-200 ${isDark ? 'text-zinc-400' : 'text-[#f05a3e]'}`} />
+          <Search className={`w-4 h-4 mr-2.5 shrink-0 transition-colors duration-200 ${isDark ? 'text-zinc-400' : 'text-[#fc9f62]'}`} />
           <input 
             type="search" 
             placeholder="Search SKU or Product..." 
@@ -49,11 +49,11 @@ export default function Navbar({ toggleSidebar, onLogout, theme = 'dark', onTogg
         {/* Modern Sun/Moon Theme Toggle Switcher */}
         {onToggleTheme && (
           <button 
-            onClick={onToggleTheme}
+          onClick={onToggleTheme}
             className={`p-2 rounded-xl border transition-all active:scale-95 flex items-center justify-center cursor-pointer shadow-3xs ${
               isDark 
-                ? 'bg-[#1c1d21] border-[#25272c] hover:bg-[#25272c] text-[#c5f82a]' 
-                : 'bg-white border-slate-200 hover:bg-slate-50 text-[#f05a3e]'
+                ? 'bg-[#1c1d21] border-[#25272c] hover:bg-[#25272c] text-[#ffd053]' 
+                : 'bg-white border-slate-200 hover:bg-slate-50 text-[#fc9f62]'
             }`}
             title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
@@ -77,7 +77,7 @@ export default function Navbar({ toggleSidebar, onLogout, theme = 'dark', onTogg
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black uppercase shadow-xs ${
             localStorage.getItem('epedu_role') === 'viewer' 
               ? 'bg-amber-500' 
-              : (isDark ? 'bg-[#c5f82a] text-black font-black' : 'bg-[#f05a3e]')
+              : (isDark ? 'bg-[#ffd053] text-black font-black' : 'bg-[#fc9f62]')
           }`}>
             {initial}
           </div>

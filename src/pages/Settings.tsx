@@ -166,8 +166,11 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
         isDark ? "border-[#25272c]" : "border-slate-200"
       }`}>
         <div>
-          <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2.5 ${isDark ? "text-white" : "text-slate-800"}`}>
-            <SettingsIcon className={`w-6 h-6 shrink-0 ${isDark ? "text-[#c5f82a]" : "text-slate-600"}`} />
+          <h1 
+            className="text-2xl font-black tracking-tight flex items-center gap-2.5"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
+            <SettingsIcon className={`w-6 h-6 shrink-0 ${isDark ? "text-[#ffd053]" : "text-slate-600"}`} />
             <span>Corporate Settings</span>
           </h1>
           <p className={`text-xs mt-1 font-medium ${isDark ? "text-zinc-400" : "text-slate-500"}`}>Fine-tune inventory goals, spatial 3D grids, and real-time transaction tracking modules.</p>
@@ -187,7 +190,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
             type="button"
             onClick={handleSave}
             className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-extrabold text-[11px] uppercase tracking-wider transition-all shadow-md active:scale-95 ${
-              isDark ? "bg-[#c5f82a] hover:bg-[#b0df22] text-slate-900 shadow-none" : "bg-[#f05a3e] hover:bg-[#d44327] text-white"
+              isDark ? "bg-[#ffd053] hover:bg-[#ebbe46] text-slate-900 shadow-none" : "bg-[#fc9f62] hover:bg-[#e38344] text-white"
             }`}
           >
             <Save className="w-4 h-4" />
@@ -201,17 +204,17 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
         <aside className={`lg:col-span-1 border rounded-2xl p-4 shadow-sm space-y-1 ${
           isDark ? "bg-[#1c1d21] border-[#25272c]" : "bg-white border-slate-200"
         }`}>
-          <p className={`text-[9px] font-extrabold uppercase tracking-widest px-3 mb-2 ${isDark ? "text-[#c5f82a]" : "text-slate-400"}`}>Category Configurations</p>
+          <p className={`text-[9px] font-extrabold uppercase tracking-widest px-3 mb-2 ${isDark ? "text-[#ffd053]" : "text-slate-400"}`}>Category Configurations</p>
           
           <button 
             onClick={() => setActiveTab('inventory')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'inventory' 
-                ? (isDark ? 'bg-[#c5f82a]/10 text-[#c5f82a] border-l-4 border-[#c5f82a]' : 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]') 
+                ? (isDark ? 'bg-[#ffd053]/10 text-[#ffd053] border-l-4 border-[#ffd053]' : 'bg-orange-50/70 text-[#fc9f62] border-l-4 border-[#fc9f62]') 
                 : (isDark ? 'text-zinc-400 hover:bg-zinc-800/30' : 'text-slate-600 hover:bg-slate-50')
             }`}
           >
-            <Package className={`w-4 h-4 ${activeTab === 'inventory' ? (isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]') : 'text-slate-400'}`} />
+            <Package className={`w-4 h-4 ${activeTab === 'inventory' ? (isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]') : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">2. Inventory Catalog</p>
               <p className="text-[9px] text-slate-450 font-medium">Quantities, goals & barcode alerts</p>
@@ -222,11 +225,11 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
             onClick={() => setActiveTab('locations')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'locations' 
-                ? (isDark ? 'bg-[#c5f82a]/10 text-[#c5f82a] border-l-4 border-[#c5f82a]' : 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]') 
+                ? (isDark ? 'bg-[#ffd053]/10 text-[#ffd053] border-l-4 border-[#ffd053]' : 'bg-orange-50/70 text-[#fc9f62] border-l-4 border-[#fc9f62]') 
                 : (isDark ? 'text-zinc-400 hover:bg-zinc-800/30' : 'text-slate-600 hover:bg-slate-50')
             }`}
           >
-            <MapPin className={`w-4 h-4 ${activeTab === 'locations' ? (isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]') : 'text-slate-400'}`} />
+            <MapPin className={`w-4 h-4 ${activeTab === 'locations' ? (isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]') : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">3. Location Matrix</p>
               <p className="text-[9px] text-slate-455 font-medium">3D rack grid & structure defaults</p>
@@ -237,11 +240,11 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
             onClick={() => setActiveTab('status')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'status' 
-                ? (isDark ? 'bg-[#c5f82a]/10 text-[#c5f82a] border-l-4 border-[#c5f82a]' : 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]') 
+                ? (isDark ? 'bg-[#ffd053]/10 text-[#ffd053] border-l-4 border-[#ffd053]' : 'bg-orange-50/70 text-[#fc9f62] border-l-4 border-[#fc9f62]') 
                 : (isDark ? 'text-zinc-400 hover:bg-zinc-800/30' : 'text-slate-600 hover:bg-slate-50')
             }`}
           >
-            <ClipboardList className={`w-4 h-4 ${activeTab === 'status' ? (isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]') : 'text-slate-400'}`} />
+            <ClipboardList className={`w-4 h-4 ${activeTab === 'status' ? (isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]') : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">4. Status Tracker</p>
               <p className="text-[9px] text-slate-455 font-medium">Loans, rental audits & reservations</p>
@@ -252,11 +255,11 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
             onClick={() => setActiveTab('general')}
             className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all text-left ${
               activeTab === 'general' 
-                ? (isDark ? 'bg-[#c5f82a]/10 text-[#c5f82a] border-l-4 border-[#c5f82a]' : 'bg-orange-50/70 text-[#f05a3e] border-l-4 border-[#f05a3e]') 
+                ? (isDark ? 'bg-[#ffd053]/10 text-[#ffd053] border-l-4 border-[#ffd053]' : 'bg-orange-50/70 text-[#fc9f62] border-l-4 border-[#fc9f62]') 
                 : (isDark ? 'text-zinc-400 hover:bg-zinc-800/30' : 'text-slate-600 hover:bg-slate-50')
             }`}
           >
-            <Globe className={`w-4 h-4 ${activeTab === 'general' ? (isDark ? 'text-[#c5f82a]' : 'text-[#f05a3e]') : 'text-slate-400'}`} />
+            <Globe className={`w-4 h-4 ${activeTab === 'general' ? (isDark ? 'text-[#ffd053]' : 'text-[#fc9f62]') : 'text-slate-400'}`} />
             <div>
               <p className="font-extrabold">System & Auth</p>
               <p className="text-[9px] text-slate-455 font-medium">Database state & profile stats</p>
@@ -281,7 +284,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Default restocking goal threshold */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-550"}`}>Default Minimum Goal Stock Threshold</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-550"}`}>Default Minimum Goal Stock Threshold</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>Defines the target restock amount applied instantly to brand-new inventory. Sets the default alert trigger value.</p>
                   <div className="flex items-center gap-3">
                     <input 
@@ -291,7 +294,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       value={defaultGoal}
                       onChange={e => setDefaultGoal(Math.max(1, parseInt(e.target.value) || 1))}
                       className={`w-24 px-3 py-2 border rounded-lg text-xs font-bold font-mono outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
                       }`}
                     />
                     <span className="text-[11px] text-slate-400 font-semibold">Standard corporate alert default is 5 units</span>
@@ -300,7 +303,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
 
                 {/* Critical shortage threshold */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-550"}`}>Critical Level Alert Threshold</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-550"}`}>Critical Level Alert Threshold</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-455"}`}>Highlights specific stock entries in extreme red values on your dashboard when availability sinks below this line.</p>
                   <div className="flex items-center gap-3">
                     <input 
@@ -310,7 +313,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       value={criticalThreshold}
                       onChange={e => setCriticalThreshold(Math.max(0, parseInt(e.target.value) || 0))}
                       className={`w-24 px-3 py-2 border rounded-lg text-xs font-bold font-mono outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
                       }`}
                     />
                     <span className="text-[11px] text-slate-400 font-semibold">Standard corporate default is 3 units</span>
@@ -327,7 +330,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       type="checkbox" 
                       checked={allowNegativeQty}
                       onChange={e => setAllowNegativeQty(e.target.checked)}
-                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
+                      className="w-4 h-4 text-[#fc9f62] border-slate-250 rounded focus:ring-[#fc9f62] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -349,12 +352,12 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       type="checkbox" 
                       checked={autoBarcodeRequired}
                       onChange={e => setAutoBarcodeRequired(e.target.checked)}
-                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
+                      className="w-4 h-4 text-[#fc9f62] border-slate-250 rounded focus:ring-[#fc9f62] cursor-pointer"
                     />
                   </div>
                   <div>
                     <label htmlFor="autoBarcodeRequired" className={`text-xs font-extrabold cursor-pointer flex items-center gap-1.5 uppercase ${isDark ? "text-white" : "text-slate-800"}`}>
-                      <TrendingDown className="w-3.5 h-3.5 text-[#f05a3e]" />
+                      <TrendingDown className="w-3.5 h-3.5 text-[#fc9f62]" />
                       <span>Require Sku Barcode Enforcements</span>
                     </label>
                     <p className={`text-[10.5px] leading-normal mt-1 ${isDark ? "text-zinc-400" : "text-slate-455"}`}>Prevents addition of new items to catalog without establishing a unique barcode/SKU key descriptor.</p>
@@ -377,14 +380,14 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Default rack levels shelf tiers count */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-555"}`}>New Racks Level Shelf Count</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-555"}`}>New Racks Level Shelf Count</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>Specific default deck tiers generated automatically when adding new structural storage cabinets inside the 3D studio.</p>
                   <div className="flex items-center gap-3">
                     <select 
                       value={defaultRackLevels}
                       onChange={e => setDefaultRackLevels(parseInt(e.target.value) || 3)}
                       className={`w-32 px-3 py-2 border rounded-lg text-xs font-bold outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755"
                       }`}
                     >
                       <option value="2">2 Tiers (Low)</option>
@@ -398,14 +401,14 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
 
                 {/* Perspective View options */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block font-sans ${isDark ? "text-[#c5f82a]" : "text-slate-555"}`}>Default 3D Camera Angles</label>
+                  <label className={`text-[10px] font-black uppercase block font-sans ${isDark ? "text-[#ffd053]" : "text-slate-555"}`}>Default 3D Camera Angles</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>The default perspective angle preset triggered immediately upon entering the 3D Location visualizer map screen.</p>
                   <div>
                     <select 
                       value={perspectivePreset}
                       onChange={e => setPerspectivePreset(e.target.value as any)}
                       className={`w-48 px-3 py-2 border rounded-lg text-xs font-bold outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755"
                       }`}
                     >
                       <option value="default">Strategic Perspective Angle</option>
@@ -417,14 +420,14 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
 
                 {/* Grid Density size */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-555"}`}>Spatial Floor Grid Density</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-555"}`}>Spatial Floor Grid Density</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>Alters visual grid spacing parameters rendered across three-dimensional warehouse space layouts.</p>
                   <div>
                     <select 
                       value={gridSize}
                       onChange={e => setGridSize(e.target.value as any)}
                       className={`w-48 px-3 py-2 border rounded-lg text-xs font-bold outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755"
                       }`}
                     >
                       <option value="small">Sparse (Cell size: 2m)</option>
@@ -444,7 +447,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       type="checkbox" 
                       checked={showZoneHighlights}
                       onChange={e => setShowZoneHighlights(e.target.checked)}
-                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
+                      className="w-4 h-4 text-[#fc9f62] border-slate-250 rounded focus:ring-[#fc9f62] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -472,14 +475,14 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Default status assigned destination */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-550"}`}>Standard Hold Location / Warehouse</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-550"}`}>Standard Hold Location / Warehouse</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>Default destination state set automatically during creation of status records.</p>
                   <div>
                     <select 
                       value={defaultStatusLocation}
                       onChange={e => setDefaultStatusLocation(e.target.value)}
                       className={`w-48 px-3 py-2 border rounded-lg text-xs font-bold outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755"
                       }`}
                     >
                       <option value="Client">Client Site</option>
@@ -493,7 +496,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
 
                 {/* Default loan grace period days */}
                 <div className="space-y-2">
-                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#c5f82a]" : "text-slate-555"}`}>Due Rental Grace Interval Limits</label>
+                  <label className={`text-[10px] font-black uppercase block ${isDark ? "text-[#ffd053]" : "text-slate-555"}`}>Due Rental Grace Interval Limits</label>
                   <p className={`text-[11px] leading-normal ${isDark ? "text-zinc-400" : "text-slate-450"}`}>Defines standard loan periods (in calendar days) automatically flagged for auditor checks.</p>
                   <div className="flex items-center gap-3">
                     <input 
@@ -503,7 +506,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       value={defaultLoanLimitDays}
                       onChange={e => setDefaultLoanLimitDays(Math.max(1, parseInt(e.target.value) || 14))}
                       className={`w-24 px-3 py-2 border rounded-lg text-xs font-bold font-mono outline-none transition-all ${
-                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#c5f82a]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
+                        isDark ? "bg-[#111215] border-zinc-700 text-white focus:border-[#ffd053]" : "bg-white border-slate-205 text-slate-755 focus:border-blue-500"
                       }`}
                     />
                     <span className="text-[11px] text-slate-400 font-semibold">Standard corporate timeline: 14 days</span>
@@ -520,7 +523,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       type="checkbox" 
                       checked={autoRestockOnDelete}
                       onChange={e => setAutoRestockOnDelete(e.target.checked)}
-                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
+                      className="w-4 h-4 text-[#fc9f62] border-slate-250 rounded focus:ring-[#fc9f62] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -542,7 +545,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                       type="checkbox" 
                       checked={restrictToCatalog}
                       onChange={e => setRestrictToCatalog(e.target.checked)}
-                      className="w-4 h-4 text-[#f05a3e] border-slate-250 rounded focus:ring-[#f05a3e] cursor-pointer"
+                      className="w-4 h-4 text-[#fc9f62] border-slate-250 rounded focus:ring-[#fc9f62] cursor-pointer"
                     />
                   </div>
                   <div>
@@ -571,7 +574,7 @@ export default function Settings({ theme = 'dark' }: { theme?: 'light' | 'dark' 
                 <div className={`rounded-xl p-4 space-y-3 border transition-colors ${
                   isDark ? "bg-[#111215]/60 border-zinc-750 text-white" : "bg-slate-50 border-slate-200 text-slate-850"
                 }`}>
-                  <div className={`flex items-center gap-2 border-b pb-2 ${isDark ? "border-zinc-800 text-[#c5f82a]" : "border-slate-150 text-indigo-900"}`}>
+                  <div className={`flex items-center gap-2 border-b pb-2 ${isDark ? "border-zinc-800 text-[#ffd053]" : "border-slate-150 text-indigo-900"}`}>
                     <Database className="w-4 h-4" />
                     <h4 className="text-xs font-bold uppercase">Cloud Cluster Integrity</h4>
                   </div>

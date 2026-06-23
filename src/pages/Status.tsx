@@ -28,6 +28,7 @@ interface StatusRecord {
 }
 
 export default function Status({ theme = 'dark' }: { theme?: 'light' | 'dark' }) {
+  const isDark = theme === 'dark';
   const [search, setSearch] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'All' | 'Loan' | 'Rent' | 'Reserve' | 'Completed'>('All');
   const [statuses, setStatuses] = useState<StatusRecord[]>([]);
@@ -757,7 +758,12 @@ export default function Status({ theme = 'dark' }: { theme?: 'light' | 'dark' })
 
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Status Tracker</h1>
+          <h1 
+            className="text-2xl font-black tracking-tight"
+            style={{ color: isDark ? '#f5f5f6' : '#00000c' }}
+          >
+            Status Tracker
+          </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">Track and coordinate individual loan and rent sets instantly across operations.</p>
         </div>
         <button 
